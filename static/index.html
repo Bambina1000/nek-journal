@@ -205,7 +205,7 @@
         .confidence-number { font-family: 'Major Mono Display', monospace; font-weight: 700; font-size: 0.9rem; color: var(--gold); min-width: 20px; text-align: center; }
         .confidence-label { font-size: 0.6rem; color: rgba(212,168,83,0.6); margin-right: 0.1rem; }
         /* Hamburger menu */
-        .hamburger { display:flex; flex-direction:column; gap:4px; background:none; border:none; padding:4px; cursor:pointer; touch-action:manipulation; }
+        .hamburger { display:flex; flex-direction:column; gap:4px; background:none; border:none; padding:8px; cursor:pointer; touch-action:manipulation; }
         .hamburger span { display:block; width:24px; height:2px; background:var(--gold); border-radius:2px; transition:all 0.3s; }
         .hamburger.active span:nth-child(1) { transform:rotate(45deg) translate(4px,4px); }
         .hamburger.active span:nth-child(2) { opacity:0; }
@@ -280,7 +280,7 @@
         <header class="header">
             <div class="header-top">
                 <div style="display:flex;align-items:center;gap:0.4rem;">
-                    <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Toggle menu">
+                    <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu">
                         <span></span><span></span><span></span>
                     </button>
                     <span class="title" id="view-title">Dashboard</span>
@@ -1864,6 +1864,36 @@
                 }
             });
         }
+
+        // ============================================================
+        // SIDEBAR TOGGLE (FIXED FOR MOBILE)
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const hamburger = document.getElementById('hamburgerBtn');
+
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+                hamburger.classList.toggle('active');
+            }
+
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+                hamburger.classList.remove('active');
+            }
+
+            // Attach event listeners
+            hamburger.addEventListener('click', toggleSidebar);
+            overlay.addEventListener('click', closeSidebar);
+            document.querySelector('.close-btn').addEventListener('click', closeSidebar);
+
+            // Expose functions globally for inline onclick usage
+            window.toggleSidebar = toggleSidebar;
+            window.closeSidebar = closeSidebar;
+        });
 
         // ============================================================
         // INIT
