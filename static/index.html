@@ -595,7 +595,8 @@
         // ============================================================
         // CONFIG
         // ============================================================
-        const API_URL = "http://127.0.0.1:8000";
+        // Use relative path so it works on any domain (Render, Railway, localhost)
+        const API_URL = "";
         let allTradesCache = [];
         let allAccountsCache = [];
         let equityChartInstance = null;
