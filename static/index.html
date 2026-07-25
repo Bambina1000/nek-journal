@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
     <title>NEK JOURNAL</title>
+    <link rel="manifest" href="/static/manifest.json">
     <script>
         (function() {
             const savedMode = localStorage.getItem('dt-journal-mode');
@@ -14,12 +15,15 @@
             }
             document.documentElement.classList.add('theme-gold');
         })();
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js');
+        }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Major+Mono+Display&display=swap" rel="stylesheet" />
     <style>
-        /* === BASE THEME === */
+        /* === BASE THEME (unchanged) === */
         :root { --gold: #d4a853; --gold-light: #f5d68a; --gold-dark: #b8923a; --gold-glow: rgba(212,168,83,0.25); --bg-card: #141414; }
         .dark { --bg-body: #0a0a0a; --bg-card: #141414; --text-primary: #f5f5f5; --text-secondary: rgba(245,245,245,0.7); --border-color: rgba(212,168,83,0.15); }
         .light { --bg-body: #f5f7fa; --bg-card: #ffffff; --text-primary: #1a1a1a; --text-secondary: rgba(26,26,26,0.7); --border-color: rgba(212,168,83,0.25); }
@@ -175,6 +179,13 @@
         .streak-badge { font-weight:700; font-family:'Major Mono Display',monospace; }
         .streak-badge.win { color:var(--gold); }
         .streak-badge.loss { color:#ff5555; }
+
+        /* Watchlist styles */
+        .watchlist-item { display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border-color); }
+        .watchlist-item .symbol { font-weight:600; }
+        .watchlist-item .notes { color:var(--text-secondary); font-size:0.8rem; }
+        .watchlist-item .remove-btn { color:#ff5555; cursor:pointer; background:none; border:none; font-size:1.2rem; }
+        .watchlist-item .remove-btn:hover { transform:scale(1.2); }
     </style>
 </head>
 <body>
@@ -197,10 +208,18 @@
                 <span>📈</span>
                 <span class="hidden-text">Analytics</span>
             </button>
+            <button onclick="switchView('watchlist'); closeSidebar();" id="nav-watchlist" class="nav-item">
+                <span>📋</span>
+                <span class="hidden-text">Watchlist</span>
+            </button>
         </nav>
         <div class="sidebar-footer">
             <button onclick="toggleTheme()"><span>⚡</span><span class="hidden-text">Toggle Theme</span></button>
             <div class="status"><span class="dot"></span><span class="hidden-text">Online</span></div>
+            <button onclick="backupData()" style="background:rgba(212,168,83,0.15);"><span>💾</span><span class="hidden-text">Backup</span></button>
+            <button onclick="document.getElementById('restoreFile').click()" style="background:rgba(212,168,83,0.15);"><span>📂</span><span class="hidden-text">Restore</span></button>
+            <input type="file" id="restoreFile" accept=".json" style="display:none;" onchange="restoreData(event)" />
+            <button onclick="logout()" id="logoutBtn" style="background:rgba(255,85,85,0.1);border-color:rgba(255,85,85,0.3);color:#ff5555;"><span>🚪</span><span class="hidden-text">Logout</span></button>
         </div>
     </aside>
 
@@ -214,6 +233,7 @@
                         <span></span><span></span><span></span>
                     </button>
                     <span class="title" id="view-title">Dashboard</span>
+                    <span id="userDisplay" style="font-size:0.7rem;color:var(--gold);margin-left:0.5rem;"></span>
                 </div>
                 <div class="search">
                     <span class="icon">🔍</span>
@@ -249,10 +269,8 @@
         <main class="main">
             <!-- DASHBOARD VIEW -->
             <div id="view-dashboard" class="view active">
-                <!-- Metrics Cards -->
+                <!-- Metrics Cards (unchanged) -->
                 <div class="grid-3" style="margin-bottom:0.75rem;">
-
-                    <!-- Performance Card -->
                     <div class="card">
                         <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;display:flex;justify-content:space-between;margin-bottom:0.4rem;">
                             <span>⚡ Perf</span>
@@ -277,8 +295,6 @@
                             <p id="metric-sharpe" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:var(--gold);">0.00</p>
                         </div>
                     </div>
-
-                    <!-- Consistency Card -->
                     <div class="card">
                         <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;display:flex;justify-content:space-between;margin-bottom:0.4rem;">
                             <span>🎯 Consist.</span>
@@ -313,8 +329,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Risk Card -->
                     <div class="card">
                         <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;display:flex;justify-content:space-between;margin-bottom:0.4rem;">
                             <span>🛡️ Risk</span>
@@ -357,7 +371,7 @@
                     </div>
                 </div>
 
-                <!-- Trade Table -->
+                <!-- Trade Table (add Status column) -->
                 <div class="card">
                     <h2 style="font-size:0.9rem;font-weight:700;color:var(--gold);margin-bottom:0.5rem;">Execution History</h2>
                     <div class="table-wrap">
@@ -373,18 +387,19 @@
                                     <th>Acct</th>
                                     <th>Conf.</th>
                                     <th>Sess</th>
+                                    <th>Status</th>
                                     <th style="text-align:center;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="tradesTableBody">
-                                <tr><td colspan="10" class="no-trades">No trades found.</td></tr>
+                                <tr><td colspan="11" class="no-trades">No trades found.</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- ANALYTICS VIEW -->
+            <!-- ANALYTICS VIEW (unchanged) -->
             <div id="view-analytics" class="view">
                 <div class="grid-3" style="margin-bottom:0.75rem;">
                     <div class="card">
@@ -422,13 +437,26 @@
                     <div style="height:150px;max-width:300px;margin:0 auto;"><canvas id="distributionChart"></canvas></div>
                 </div>
             </div>
+
+            <!-- WATCHLIST VIEW -->
+            <div id="view-watchlist" class="view">
+                <div class="card">
+                    <h3 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem;">📋 Watchlist</h3>
+                    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+                        <input type="text" id="watchlist-symbol" placeholder="e.g. BTC/USD" style="flex:1;" />
+                        <input type="text" id="watchlist-notes" placeholder="Notes" style="flex:2;" />
+                        <button onclick="addWatchlist()" class="btn-gold" style="padding:0.3rem 1rem;">Add</button>
+                    </div>
+                    <div id="watchlist-items"></div>
+                </div>
+            </div>
         </main>
     </div>
 
     <!-- ===== ADD TRADE BUTTON ===== -->
     <button id="addTradeBtn">+ ADD</button>
 
-    <!-- ===== TRADE MODAL ===== -->
+    <!-- ===== TRADE MODAL (updated with Status & Journal) ===== -->
     <div id="tradeModal" class="modal-backdrop">
         <div class="modal-content slide-in">
             <button class="close" id="closeModalBtn">&times;</button>
@@ -480,18 +508,34 @@
                     </div>
                 </div>
 
-                <!-- Confidence Level -->
-                <div class="form-group">
-                    <label>Confidence Level</label>
-                    <div class="confidence-container">
-                        <span class="confidence-label">1</span>
-                        <div class="confidence-dots" id="confidenceDots"></div>
-                        <span class="confidence-number" id="confidenceNumber">-</span>
-                        <span class="confidence-label">10</span>
+                <!-- NEW: Trade Status & Confidence -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Trade Status</label>
+                        <select id="modal-status">
+                            <option value="Closed">Closed</option>
+                            <option value="Open">Open</option>
+                        </select>
                     </div>
-                    <input type="hidden" id="modal-confidence" value="" />
+                    <div class="form-group">
+                        <label>Confidence Level</label>
+                        <div class="confidence-container">
+                            <span class="confidence-label">1</span>
+                            <div class="confidence-dots" id="confidenceDots"></div>
+                            <span class="confidence-number" id="confidenceNumber">-</span>
+                            <span class="confidence-label">10</span>
+                        </div>
+                        <input type="hidden" id="modal-confidence" value="" />
+                    </div>
                 </div>
 
+                <!-- NEW: Journal Entry -->
+                <div class="form-group">
+                    <label>Journal Entry (Reflection)</label>
+                    <textarea id="modal-journal" rows="4" placeholder="Write your full reflection here..."></textarea>
+                </div>
+
+                <!-- Screenshots -->
                 <div class="form-group">
                     <label>Before Trade Screenshot</label>
                     <div class="file-input-wrapper">
@@ -539,7 +583,7 @@
         </div>
     </div>
 
-    <!-- ===== ADD ACCOUNT MODAL ===== -->
+    <!-- ===== ADD ACCOUNT MODAL (unchanged) ===== -->
     <div id="addAccountModal" class="modal-backdrop">
         <div class="modal-content slide-in" style="max-width:500px;">
             <button class="close" onclick="closeAddAccountModal()">&times;</button>
@@ -591,66 +635,177 @@
         </div>
     </div>
 
+    <!-- ===== AUTH MODAL ===== -->
+    <div id="authModal" class="modal-backdrop show">
+        <div class="modal-content slide-in" style="max-width:400px;margin:auto;">
+            <button class="close" onclick="closeAuth()">&times;</button>
+            <h2 style="text-align:center;">Welcome Back</h2>
+            <div style="display:flex;gap:1rem;border-bottom:1px solid var(--border-color);margin-bottom:1rem;">
+                <button onclick="switchAuthTab('login')" id="loginTab" class="active" style="background:none;border:none;padding:0.5rem 0;font-weight:700;color:var(--gold);border-bottom:2px solid var(--gold);flex:1;">Login</button>
+                <button onclick="switchAuthTab('register')" id="registerTab" style="background:none;border:none;padding:0.5rem 0;font-weight:700;color:var(--text-secondary);border-bottom:2px solid transparent;flex:1;">Register</button>
+            </div>
+            <form id="loginForm" onsubmit="login(event)">
+                <div class="form-group"><label>Username</label><input type="text" id="login-username" required /></div>
+                <div class="form-group"><label>Password</label><input type="password" id="login-password" required /></div>
+                <button type="submit" class="btn-gold" style="width:100%;">Login</button>
+            </form>
+            <form id="registerForm" style="display:none;" onsubmit="register(event)">
+                <div class="form-group"><label>Username</label><input type="text" id="reg-username" required /></div>
+                <div class="form-group"><label>Email</label><input type="email" id="reg-email" required /></div>
+                <div class="form-group"><label>Password</label><input type="password" id="reg-password" required /></div>
+                <button type="submit" class="btn-gold" style="width:100%;">Register</button>
+            </form>
+            <div id="authMessage" style="margin-top:1rem;text-align:center;color:var(--gold);"></div>
+        </div>
+    </div>
+
     <script>
         // ============================================================
-        // CONFIG
+        // CONFIG & AUTH
         // ============================================================
-        // Use relative path so it works on any domain (Render, Railway, localhost)
         const API_URL = "";
+        let token = localStorage.getItem('access_token');
         let allTradesCache = [];
         let allAccountsCache = [];
+        let allWatchlistCache = [];
         let equityChartInstance = null;
         let currentCalendarDate = new Date();
         let strategyChart = null, monthlyChart = null, winRateChart = null, sessionChart = null, distributionChart = null;
         let rMultipleChart = null, hourlyChart = null;
 
-        // ============================================================
-        // SIDEBAR CONTROLS
-        // ============================================================
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            const hamburger = document.getElementById('hamburgerBtn');
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('active');
-            hamburger.classList.toggle('active');
+        // Auth helpers
+        function apiFetch(url, options = {}) {
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            return fetch(url, { ...options, headers });
         }
-        function closeSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            const hamburger = document.getElementById('hamburgerBtn');
-            sidebar.classList.remove('open');
-            overlay.classList.remove('active');
-            hamburger.classList.remove('active');
+
+        function closeAuth() {
+            document.getElementById('authModal').classList.remove('show');
+        }
+
+        function switchAuthTab(tab) {
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            if (tab === 'login') {
+                loginTab.className = 'active';
+                loginTab.style.borderBottom = '2px solid var(--gold)';
+                registerTab.className = '';
+                registerTab.style.borderBottom = '2px solid transparent';
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+            } else {
+                registerTab.className = 'active';
+                registerTab.style.borderBottom = '2px solid var(--gold)';
+                loginTab.className = '';
+                loginTab.style.borderBottom = '2px solid transparent';
+                registerForm.style.display = 'block';
+                loginForm.style.display = 'none';
+            }
+        }
+
+        async function login(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            try {
+                const res = await fetch(`${API_URL}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+                });
+                if (!res.ok) throw new Error('Invalid credentials');
+                const data = await res.json();
+                token = data.access_token;
+                localStorage.setItem('access_token', token);
+                document.getElementById('authModal').classList.remove('show');
+                document.getElementById('userDisplay').textContent = `👤 ${username}`;
+                fetchAllData();
+            } catch (err) {
+                document.getElementById('authMessage').textContent = 'Login failed: ' + err.message;
+            }
+        }
+
+        async function register(e) {
+            e.preventDefault();
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                if (!res.ok) throw new Error('Registration failed');
+                document.getElementById('authMessage').textContent = 'Registration successful! Please login.';
+                switchAuthTab('login');
+            } catch (err) {
+                document.getElementById('authMessage').textContent = 'Registration failed: ' + err.message;
+            }
+        }
+
+        function logout() {
+            token = null;
+            localStorage.removeItem('access_token');
+            document.getElementById('userDisplay').textContent = '';
+            document.getElementById('authModal').classList.add('show');
+            allTradesCache = [];
+            allAccountsCache = [];
+            allWatchlistCache = [];
+            renderTable([]);
+            renderCalendar([]);
+            renderAnalytics([]);
+            updateAccountMetrics([], 0);
+            computeAdvancedMetrics([]);
         }
 
         // ============================================================
-        // FETCH DATA
+        // FETCH DATA (with auth)
         // ============================================================
         async function fetchAllData() {
+            if (!token) return;
             await fetchAccounts();
             await fetchTrades();
+            await fetchWatchlist();
         }
 
         async function fetchAccounts() {
             try {
-                const res = await fetch(`${API_URL}/accounts/`);
+                const res = await apiFetch(`${API_URL}/accounts/`);
                 if (!res.ok) throw new Error('Failed to fetch accounts');
                 allAccountsCache = await res.json();
                 populateAccountSelects();
             } catch (err) {
                 console.error('Account fetch error:', err);
+                if (err.message.includes('401')) logout();
             }
         }
 
         async function fetchTrades() {
             try {
-                const res = await fetch(`${API_URL}/trades/`);
+                const res = await apiFetch(`${API_URL}/trades/`);
                 if (!res.ok) throw new Error('Failed to fetch trades');
                 allTradesCache = await res.json();
                 applyFiltersAndUpdate();
             } catch (err) {
                 console.error('Trade fetch error:', err);
+                if (err.message.includes('401')) logout();
+            }
+        }
+
+        async function fetchWatchlist() {
+            try {
+                const res = await apiFetch(`${API_URL}/watchlist/`);
+                if (!res.ok) throw new Error('Failed to fetch watchlist');
+                allWatchlistCache = await res.json();
+                renderWatchlist();
+            } catch (err) {
+                console.error('Watchlist fetch error:', err);
             }
         }
 
@@ -705,7 +860,7 @@
         }
 
         // ============================================================
-        // ACCOUNT CRUD
+        // ACCOUNT CRUD (unchanged)
         // ============================================================
         document.getElementById('accountForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -718,7 +873,7 @@
                 purchase_cost: parseFloat(document.getElementById('acc-purchase-cost').value) || 0,
             };
             try {
-                const res = await fetch(`${API_URL}/accounts/`, {
+                const res = await apiFetch(`${API_URL}/accounts/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -740,11 +895,105 @@
         }
 
         // ============================================================
-        // EXPORT CSV
+        // WATCHLIST
+        // ============================================================
+        async function addWatchlist() {
+            const symbol = document.getElementById('watchlist-symbol').value.trim();
+            const notes = document.getElementById('watchlist-notes').value.trim();
+            if (!symbol) return alert('Please enter a symbol.');
+            try {
+                const res = await apiFetch(`${API_URL}/watchlist/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol, notes })
+                });
+                if (!res.ok) throw new Error('Failed to add');
+                document.getElementById('watchlist-symbol').value = '';
+                document.getElementById('watchlist-notes').value = '';
+                fetchWatchlist();
+            } catch (err) {
+                alert('Error adding watchlist item: ' + err.message);
+            }
+        }
+
+        async function deleteWatchlist(id) {
+            if (!confirm('Remove this item?')) return;
+            try {
+                const res = await apiFetch(`${API_URL}/watchlist/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed to delete');
+                fetchWatchlist();
+            } catch (err) {
+                alert('Error deleting: ' + err.message);
+            }
+        }
+
+        function renderWatchlist() {
+            const container = document.getElementById('watchlist-items');
+            container.innerHTML = '';
+            if (allWatchlistCache.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-secondary);">No items in watchlist.</p>';
+                return;
+            }
+            allWatchlistCache.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'watchlist-item';
+                div.innerHTML = `
+                    <div>
+                        <span class="symbol">${item.symbol}</span>
+                        ${item.notes ? `<span class="notes"> — ${item.notes}</span>` : ''}
+                    </div>
+                    <button class="remove-btn" onclick="deleteWatchlist(${item.id})">✕</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ============================================================
+        // BACKUP & RESTORE
+        // ============================================================
+        async function backupData() {
+            try {
+                const res = await apiFetch(`${API_URL}/backup/`);
+                if (!res.ok) throw new Error('Backup failed');
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `nek_journal_backup_${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Backup error: ' + err.message);
+            }
+        }
+
+        async function restoreData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                const res = await apiFetch(`${API_URL}/restore/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) throw new Error('Restore failed');
+                alert('Restore successful!');
+                fetchAllData();
+            } catch (err) {
+                alert('Restore error: ' + err.message);
+            }
+            event.target.value = '';
+        }
+
+        // ============================================================
+        // EXPORT CSV (with auth)
         // ============================================================
         async function exportCSV() {
             try {
-                const res = await fetch(`${API_URL}/export/csv`);
+                const res = await apiFetch(`${API_URL}/export/csv`);
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -758,13 +1007,13 @@
         }
 
         // ============================================================
-        // RENDER TABLE
+        // RENDER TABLE (added Status column)
         // ============================================================
         function renderTable(trades) {
             const tbody = document.getElementById('tradesTableBody');
             tbody.innerHTML = '';
             if (trades.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="no-trades">No trades found.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" class="no-trades">No trades found.</td></tr>`;
                 return;
             }
             trades.slice().reverse().forEach(t => {
@@ -783,6 +1032,7 @@
                     <td style="font-size:0.6rem;color:var(--text-secondary);">${accountName}</td>
                     <td style="font-family:'Major Mono Display',monospace;font-size:0.6rem;color:${t.confidence ? 'var(--gold)' : 'var(--text-secondary)'};">${t.confidence || '-'}</td>
                     <td><span class="badge badge-session">${t.session || '-'}</span></td>
+                    <td><span class="badge" style="background:${t.status === 'Open' ? 'rgba(50,200,100,0.2)' : 'var(--bg-body)'};color:${t.status === 'Open' ? '#32c864' : 'var(--text-secondary)'};">${t.status || 'Closed'}</span></td>
                     <td style="text-align:center;">
                         <div class="action-btns">
                             <button class="edit-btn" onclick="editTrade(${t.id})" title="Edit">✏️</button>
@@ -795,7 +1045,7 @@
         }
 
         // ============================================================
-        // EDIT
+        // EDIT (added journal_entry, status)
         // ============================================================
         function editTrade(id) {
             const trade = allTradesCache.find(t => t.id === id);
@@ -820,6 +1070,8 @@
             document.getElementById('modal-time').value = trade.created_at ? trade.created_at.split('T')[1].slice(0,5) : '';
             document.getElementById('modal-stop').value = trade.stop_loss || '';
             document.getElementById('modal-tp').value = trade.take_profit || '';
+            document.getElementById('modal-status').value = trade.status || 'Closed';
+            document.getElementById('modal-journal').value = trade.journal_entry || '';
             if (trade.confidence) setConfidence(trade.confidence);
             else resetConfidence();
             document.getElementById('before-preview').src = '';
@@ -833,12 +1085,12 @@
         }
 
         // ============================================================
-        // DELETE
+        // DELETE, SUBMIT, CONFIDENCE, etc. (mostly unchanged, but include new fields)
         // ============================================================
         async function deleteTrade(id) {
             if (!confirm('Delete this trade?')) return;
             try {
-                const res = await fetch(`${API_URL}/trades/${id}`, { method: 'DELETE' });
+                const res = await apiFetch(`${API_URL}/trades/${id}`, { method: 'DELETE' });
                 if (!res.ok) throw new Error('Delete failed');
                 fetchAllData();
             } catch (err) {
@@ -846,9 +1098,6 @@
             }
         }
 
-        // ============================================================
-        // SUBMIT TRADE
-        // ============================================================
         document.getElementById('tradeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const editId = document.getElementById('editTradeId').value;
@@ -870,6 +1119,9 @@
             formData.append('account_id', document.getElementById('modal-account').value || '');
             formData.append('stop_loss', document.getElementById('modal-stop').value || '');
             formData.append('take_profit', document.getElementById('modal-tp').value || '');
+            // NEW FIELDS
+            formData.append('status', document.getElementById('modal-status').value);
+            formData.append('journal_entry', document.getElementById('modal-journal').value || '');
 
             const beforeFile = document.getElementById('modal-before-image').files[0];
             const afterFile = document.getElementById('modal-after-image').files[0];
@@ -899,12 +1151,22 @@
                         session: formData.get('session') || null,
                         account_id: parseInt(formData.get('account_id')) || null,
                         stop_loss: parseFloat(formData.get('stop_loss')) || null,
-                        take_profit: parseFloat(formData.get('take_profit')) || null
+                        take_profit: parseFloat(formData.get('take_profit')) || null,
+                        status: formData.get('status'),
+                        journal_entry: formData.get('journal_entry') || null
                     };
-                    const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    const res = await fetch(url, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(payload)
+                    });
                     if (!res.ok) throw new Error('Update failed');
                 } else {
-                    const res = await fetch(url, { method: 'POST', body: formData });
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
                     if (!res.ok) throw new Error('Create failed');
                 }
                 document.getElementById('tradeModal').classList.remove('show');
@@ -964,13 +1226,14 @@
             document.getElementById('view-' + view).classList.add('active');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('nav-' + view).classList.add('active');
-            document.getElementById('view-title').textContent = view === 'dashboard' ? 'Dashboard' : 'Analytics';
+            document.getElementById('view-title').textContent = view === 'dashboard' ? 'Dashboard' : view === 'analytics' ? 'Analytics' : 'Watchlist';
             if (view === 'dashboard' && equityChartInstance) equityChartInstance.resize();
             if (view === 'analytics') renderAnalytics(allTradesCache);
+            if (view === 'watchlist') renderWatchlist();
         }
 
         // ============================================================
-        // METRICS
+        // METRICS (unchanged)
         // ============================================================
         function updateAccountMetrics(trades, baseCapital) {
             let totalPnl = trades.reduce((acc, t) => acc + t.pnl, 0);
@@ -1084,7 +1347,7 @@
         }
 
         // ============================================================
-        // CALENDAR
+        // CALENDAR (unchanged)
         // ============================================================
         function changeMonth(delta) {
             currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
@@ -1122,7 +1385,7 @@
         }
 
         // ============================================================
-        // MODAL CONTROLS
+        // MODAL CONTROLS (unchanged)
         // ============================================================
         function openModal() {
             document.getElementById('tradeModal').classList.add('show');
@@ -1139,6 +1402,8 @@
             document.getElementById('modal-after-image').value = '';
             document.getElementById('modal-stop').value = '';
             document.getElementById('modal-tp').value = '';
+            document.getElementById('modal-status').value = 'Closed';
+            document.getElementById('modal-journal').value = '';
             resetPreview('before'); resetPreview('after');
         }
         function closeModal() { document.getElementById('tradeModal').classList.remove('show'); }
@@ -1187,7 +1452,7 @@
         }
 
         // ============================================================
-        // ANALYTICS CHARTS
+        // ANALYTICS CHARTS (unchanged)
         // ============================================================
         function renderAnalytics(trades) {
             if (!document.getElementById('view-analytics').classList.contains('active')) return;
@@ -1293,9 +1558,17 @@
         // INIT
         // ============================================================
         initConfidenceDots();
+
+        // Check if token exists and auto-login
+        if (token) {
+            document.getElementById('authModal').classList.remove('show');
+            fetchAllData();
+        } else {
+            document.getElementById('authModal').classList.add('show');
+        }
+
         document.getElementById('accountSelect').addEventListener('change', applyFiltersAndUpdate);
         document.getElementById('sessionFilter').addEventListener('change', applyFiltersAndUpdate);
-        fetchAllData();
     </script>
 </body>
 </html>

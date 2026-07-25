@@ -1,7 +1,28 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
 
+# ===== USER =====
+class UserBase(BaseModel):
+    username: str
+    email: EmailStr
+
+class UserCreate(UserBase):
+    password: str
+
+class UserResponse(UserBase):
+    id: int
+    created_at: datetime
+    class Config: orm_mode = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+# ===== ACCOUNT =====
 class AccountBase(BaseModel):
     name: str
     starting_balance: float = 0.0
@@ -10,7 +31,8 @@ class AccountBase(BaseModel):
     status: str = "Active"
     purchase_cost: float = 0.0
 
-class AccountCreate(AccountBase): pass
+class AccountCreate(AccountBase):
+    pass
 
 class AccountResponse(AccountBase):
     id: int
@@ -25,6 +47,7 @@ class AccountUpdate(BaseModel):
     status: Optional[str] = None
     purchase_cost: Optional[float] = None
 
+# ===== TRADE =====
 class TradeCreate(BaseModel):
     pair: str
     direction: str
@@ -43,8 +66,11 @@ class TradeCreate(BaseModel):
     confidence: Optional[int] = None
     session: Optional[str] = None
     account_id: Optional[int] = None
-    stop_loss: Optional[float] = None          # NEW
-    take_profit: Optional[float] = None        # NEW
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    # NEW
+    status: Optional[str] = "Closed"
+    journal_entry: Optional[str] = None
 
 class TradeResponse(TradeCreate):
     id: int
@@ -72,3 +98,32 @@ class TradeUpdate(BaseModel):
     account_id: Optional[int] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
+    # NEW
+    status: Optional[str] = None
+    journal_entry: Optional[str] = None
+
+# ===== WATCHLIST =====
+class WatchlistItemBase(BaseModel):
+    symbol: str
+    notes: Optional[str] = None
+
+class WatchlistItemCreate(WatchlistItemBase):
+    pass
+
+class WatchlistItemResponse(WatchlistItemBase):
+    id: int
+    added_at: datetime
+    class Config: orm_mode = True
+
+# ===== REPORT SETTINGS =====
+class ReportSettingBase(BaseModel):
+    email: EmailStr
+    frequency: str = "weekly"
+
+class ReportSettingCreate(ReportSettingBase):
+    pass
+
+class ReportSettingResponse(ReportSettingBase):
+    id: int
+    last_sent: Optional[datetime] = None
+    class Config: orm_mode = True
