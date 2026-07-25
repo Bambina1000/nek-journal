@@ -5,3 +5,4 @@ pydantic
 python-multipart
 pillow
 pytesseract
+psycopg2-binary
