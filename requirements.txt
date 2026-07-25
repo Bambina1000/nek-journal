@@ -5,5 +5,5 @@ pydantic
 python-multipart
 pillow
 pytesseract
-libsql-client
 sqlalchemy-libsql
+libsql-client
