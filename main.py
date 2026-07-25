@@ -26,7 +26,9 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 SECRET_KEY = "your-super-secret-key-change-this-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# 🔥 INCREASED TOKEN EXPIRY – 7 days (10,080 minutes)
+ACCESS_TOKEN_EXPIRE_MINUTES = 10080   # 7 days
 
 # FIX: Use pbkdf2_sha256 instead of bcrypt to avoid 72-byte password limit
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -72,7 +74,7 @@ def authenticate_user(db: Session, username: str, password: str):
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -117,8 +119,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
-    access_token = create_access_token(data={"sub": user.username},
-                                       expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 
