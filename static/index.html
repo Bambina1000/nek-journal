@@ -843,7 +843,7 @@
                 if (!res.ok) throw new Error('Failed to fetch accounts');
                 allAccountsCache = await res.json();
                 populateAccountSelects();
-                renderAccountList(); // update manage accounts modal if open
+                renderAccountList();
             } catch (err) {
                 console.error('Account fetch error:', err);
                 if (err.message.includes('401')) logout();
@@ -927,8 +927,8 @@
             try {
                 const res = await apiFetch(`${API_URL}/accounts/${accountId}`, { method: 'DELETE' });
                 if (!res.ok) throw new Error('Delete failed');
-                await fetchAllData(); // refresh everything
-                renderAccountList(); // update modal
+                await fetchAllData();
+                renderAccountList();
             } catch (err) {
                 alert('Delete failed: ' + err.message);
             }
@@ -1112,7 +1112,7 @@
         }
 
         // ============================================================
-        // RENDER TABLE (with green/red P&L, direction badges, and hover)
+        // RENDER TABLE
         // ============================================================
         function renderTable(trades) {
             const tbody = document.getElementById('tradesTableBody');
@@ -1151,7 +1151,7 @@
         }
 
         // ============================================================
-        // EDIT (fixed: properly populate all fields)
+        // EDIT (populate all fields including date)
         // ============================================================
         function editTrade(id) {
             const trade = allTradesCache.find(t => t.id === id);
@@ -1177,7 +1177,9 @@
             document.getElementById('modal-tags').value = '';
             document.getElementById('modal-account').value = trade.account_id || '';
             document.getElementById('modal-session').value = trade.session || '';
-            document.getElementById('modal-date').value = trade.created_at ? trade.created_at.split('T')[0] : '';
+            // ✅ FIX: Use trade_date if available, fallback to created_at
+            const dateVal = trade.trade_date || trade.created_at || '';
+            document.getElementById('modal-date').value = dateVal ? dateVal.split('T')[0] : '';
             document.getElementById('modal-time').value = trade.created_at ? trade.created_at.split('T')[1].slice(0,5) : '';
             document.getElementById('modal-stop').value = trade.stop_loss || '';
             document.getElementById('modal-tp').value = trade.take_profit || '';
@@ -1201,7 +1203,7 @@
         }
 
         // ============================================================
-        // DELETE, SUBMIT, CONFIDENCE, etc. (mostly unchanged, but include new fields)
+        // DELETE, SUBMIT, CONFIDENCE, etc.
         // ============================================================
         async function deleteTrade(id) {
             if (!confirm('Delete this trade?')) return;
@@ -1235,7 +1237,9 @@
             formData.append('account_id', document.getElementById('modal-account').value || '');
             formData.append('stop_loss', document.getElementById('modal-stop').value || '');
             formData.append('take_profit', document.getElementById('modal-tp').value || '');
-            // NEW FIELDS
+            // ✅ FIX: Send the date from the input
+            const selectedDate = document.getElementById('modal-date').value;
+            formData.append('trade_date', selectedDate || '');
             formData.append('status', document.getElementById('modal-status').value);
             formData.append('journal_entry', document.getElementById('modal-journal').value || '');
 
@@ -1268,6 +1272,7 @@
                         account_id: parseInt(formData.get('account_id')) || null,
                         stop_loss: parseFloat(formData.get('stop_loss')) || null,
                         take_profit: parseFloat(formData.get('take_profit')) || null,
+                        trade_date: formData.get('trade_date') || null, // ✅ FIX: include trade_date
                         status: formData.get('status'),
                         journal_entry: formData.get('journal_entry') || null
                     };
@@ -1349,7 +1354,7 @@
         }
 
         // ============================================================
-        // METRICS (updated with green/red for P&L and Expectancy)
+        // METRICS
         // ============================================================
         function updateAccountMetrics(trades, baseCapital) {
             let totalPnl = trades.reduce((acc, t) => acc + t.pnl, 0);
@@ -1429,7 +1434,6 @@
             let std = Math.sqrt(pnls.reduce((s, v) => s + (v - mean) ** 2, 0) / pnls.length);
             let sharpe = std === 0 ? 0 : mean / std;
 
-            // Set Net P&L and Expectancy with green/red
             const netPnlEl = document.getElementById('metric-net-pnl');
             netPnlEl.textContent = `${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)}`;
             netPnlEl.style.color = netPnl >= 0 ? '#22c55e' : '#ef4444';
@@ -1452,7 +1456,7 @@
         }
 
         // ============================================================
-        // RENDER EQUITY CURVE – WITH GRADIENT FILL (red->green) & GOLDEN LINE
+        // RENDER EQUITY CURVE
         // ============================================================
         function renderEquityCurve(trades, baseCapital) {
             const ctx = document.getElementById('equityCurveChart').getContext('2d');
@@ -1464,11 +1468,10 @@
             const gridColor = isDark ? 'rgba(212,168,83,0.1)' : 'rgba(0,0,0,0.1)';
             const textColor = isDark ? '#d4a853' : '#4a3a1a';
 
-            // Create gradient from red (bottom) to green (top)
             const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
-            gradient.addColorStop(0, '#22c55e');   // green at top
-            gradient.addColorStop(0.5, '#d4a853'); // gold in middle
-            gradient.addColorStop(1, '#ef4444');   // red at bottom
+            gradient.addColorStop(0, '#22c55e');
+            gradient.addColorStop(0.5, '#d4a853');
+            gradient.addColorStop(1, '#ef4444');
 
             if (equityChartInstance) equityChartInstance.destroy();
 
@@ -1530,7 +1533,8 @@
             document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
             let dailyPnl = {};
             trades.forEach((t, idx) => {
-                let key = t.created_at ? t.created_at.split('T')[0] : `${year}-${String(month+1).padStart(2,'0')}-${String((idx%28)+1).padStart(2,'0')}`;
+                let key = t.trade_date || t.created_at || `${year}-${String(month+1).padStart(2,'0')}-${String((idx%28)+1).padStart(2,'0')}`;
+                if (key) key = key.split('T')[0];
                 if (!dailyPnl[key]) dailyPnl[key] = 0;
                 dailyPnl[key] += t.pnl;
             });
@@ -1558,7 +1562,7 @@
         }
 
         // ============================================================
-        // MODAL CONTROLS (fixed: reset all fields on open)
+        // MODAL CONTROLS
         // ============================================================
         function openModal() {
             document.getElementById('tradeModal').classList.add('show');
@@ -1593,7 +1597,6 @@
             resetPreview('before');
             resetPreview('after');
 
-            // Clear file inputs
             document.getElementById('modal-before-image').value = '';
             document.getElementById('modal-after-image').value = '';
         }
@@ -1654,7 +1657,7 @@
         }
 
         // ============================================================
-        // ANALYTICS CHARTS (colors updated for positive/negative)
+        // ANALYTICS CHARTS
         // ============================================================
         function renderAnalytics(trades) {
             if (!document.getElementById('view-analytics').classList.contains('active')) return;
@@ -1866,7 +1869,7 @@
         }
 
         // ============================================================
-        // SIDEBAR TOGGLE (FIXED FOR MOBILE)
+        // SIDEBAR TOGGLE
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -1885,12 +1888,10 @@
                 hamburger.classList.remove('active');
             }
 
-            // Attach event listeners
             hamburger.addEventListener('click', toggleSidebar);
             overlay.addEventListener('click', closeSidebar);
             document.querySelector('.close-btn').addEventListener('click', closeSidebar);
 
-            // Expose functions globally for inline onclick usage
             window.toggleSidebar = toggleSidebar;
             window.closeSidebar = closeSidebar;
         });
@@ -1900,7 +1901,6 @@
         // ============================================================
         initConfidenceDots();
 
-        // Check if token exists and auto-login
         if (token) {
             document.getElementById('authModal').classList.remove('show');
             fetchAllData();
