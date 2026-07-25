@@ -1456,7 +1456,7 @@
         }
 
         // ============================================================
-        // RENDER EQUITY CURVE – FIXED: chronological order, green/red line
+        // RENDER EQUITY CURVE – FIXED: chronological order, curvy line, green/red
         // ============================================================
         function renderEquityCurve(trades, baseCapital) {
             const ctx = document.getElementById('equityCurveChart').getContext('2d');
@@ -1490,8 +1490,7 @@
 
             if (equityChartInstance) equityChartInstance.destroy();
 
-            // 3. Create dataset with segment-based coloring
-            // We'll use a custom plugin to color segments based on equity vs baseCapital
+            // 3. Create dataset with segment-based coloring for a smooth curvy line
             equityChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -1499,13 +1498,15 @@
                     datasets: [{
                         label: 'Equity ($)',
                         data: data,
-                        borderWidth: 2.5,
+                        borderWidth: 3,               // thicker line
+                        borderColor: '#d4a853',       // fallback (gold)
                         fill: false,
-                        tension: 0.2,
-                        pointRadius: 4,
+                        tension: 0.4,                 // SMOOTH CURVY LINE
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
                         pointBackgroundColor: data.map(v => v >= baseCapital ? '#22c55e' : '#ef4444'),
                         pointBorderColor: '#fff',
-                        pointBorderWidth: 1.5,
+                        pointBorderWidth: 2,
                         segment: {
                             borderColor: function(context) {
                                 const current = context.parsed.y;
@@ -1552,7 +1553,7 @@
                         const xScale = chart.scales.x;
                         const yPos = yScale.getPixelForValue(baseCapital);
                         const ctx = chart.ctx;
-                        // Draw dashed baseline
+                        // Dashed baseline
                         ctx.save();
                         ctx.beginPath();
                         ctx.setLineDash([5, 5]);
@@ -1563,7 +1564,7 @@
                         ctx.lineTo(xScale.right, yPos);
                         ctx.stroke();
                         ctx.restore();
-                        // Add label
+                        // Label
                         ctx.save();
                         ctx.fillStyle = '#d4a853';
                         ctx.globalAlpha = 0.7;
