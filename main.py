@@ -193,6 +193,7 @@ async def create_trade(
         take_profit: float = Form(None),
         status: str = Form("Closed"),
         journal_entry: str = Form(None),
+        trade_date: str = Form(None),  # <=== ADDED THIS LINE
         before_image: UploadFile = File(None),
         after_image: UploadFile = File(None),
         db: Session = Depends(get_db),
@@ -236,6 +237,7 @@ async def create_trade(
         "take_profit": take_profit,
         "status": status,
         "journal_entry": journal_entry,
+        "trade_date": trade_date if trade_date else None,  # <=== ADDED THIS LINE
         "user_id": current_user.id,
     }
     db_trade = models.Trade(**trade_data)

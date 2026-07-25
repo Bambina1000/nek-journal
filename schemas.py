@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from datetime import datetime, date  # <-- ADDED date import
 from typing import Optional
 
 # ===== USER =====
@@ -71,6 +71,8 @@ class TradeCreate(BaseModel):
     # NEW
     status: Optional[str] = "Closed"
     journal_entry: Optional[str] = None
+    # ✅ ADD THIS LINE – FIX FOR DATE
+    trade_date: Optional[date] = None
 
 class TradeResponse(TradeCreate):
     id: int
@@ -101,6 +103,8 @@ class TradeUpdate(BaseModel):
     # NEW
     status: Optional[str] = None
     journal_entry: Optional[str] = None
+    # ✅ ADD THIS LINE – FIX FOR DATE
+    trade_date: Optional[date] = None
 
 # ===== WATCHLIST =====
 class WatchlistItemBase(BaseModel):
