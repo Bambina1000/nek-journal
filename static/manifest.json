@@ -1,0 +1,16 @@
+{
+  "name": "NEK JOURNAL",
+  "short_name": "NEK",
+  "description": "Personal Trading Journal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#d4a853",
+  "icons": [
+    {
+      "src": "/static/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    }
+  ]
+}
