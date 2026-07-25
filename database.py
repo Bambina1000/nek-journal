@@ -3,8 +3,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Read the database path from environment variable, or fallback to local file
+# Get the database path from environment variable
 DB_PATH = os.environ.get("DATABASE_PATH", "./journal.db")
+
+# Ensure the directory for the database file exists
+db_dir = os.path.dirname(DB_PATH)
+if db_dir and not os.path.exists(db_dir):
+    os.makedirs(db_dir, exist_ok=True)
+
+# Create the engine
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(
