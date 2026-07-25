@@ -1109,25 +1109,30 @@
         }
 
         // ============================================================
-        // EDIT (added journal_entry, status)
+        // EDIT (fixed: properly populate all fields)
         // ============================================================
         function editTrade(id) {
             const trade = allTradesCache.find(t => t.id === id);
             if (!trade) return;
+
             document.getElementById('editTradeId').value = id;
             document.getElementById('tradeModalTitle').textContent = 'Edit Trade';
-            document.getElementById('modal-pair').value = trade.pair;
-            document.getElementById('modal-direction').value = trade.direction;
-            document.getElementById('modal-position_size').value = trade.position_size;
-            document.getElementById('modal-entry').value = trade.entry_price;
-            document.getElementById('modal-exit').value = trade.exit_price;
-            document.getElementById('modal-risk_reward').value = trade.risk_reward;
-            document.getElementById('modal-pnl').value = trade.pnl;
-            document.getElementById('modal-emotion').value = trade.emotion_before;
-            document.getElementById('modal-followed_plan').value = trade.followed_plan;
+            document.getElementById('submitTradeBtn').textContent = 'Update Trade';
+
+            // Populate all fields
+            document.getElementById('modal-pair').value = trade.pair || '';
+            document.getElementById('modal-direction').value = trade.direction || 'BUY';
+            document.getElementById('modal-position_size').value = trade.position_size || '';
+            document.getElementById('modal-entry').value = trade.entry_price || '';
+            document.getElementById('modal-exit').value = trade.exit_price || '';
+            document.getElementById('modal-risk_reward').value = trade.risk_reward || '';
+            document.getElementById('modal-pnl').value = trade.pnl || '';
+            document.getElementById('modal-emotion').value = trade.emotion_before || '';
+            document.getElementById('modal-followed_plan').value = trade.followed_plan || 'YES';
             document.getElementById('modal-mistakes').value = trade.mistakes || '';
             document.getElementById('modal-notes').value = trade.notes || '';
             document.getElementById('modal-strategy').value = trade.setup_type || '';
+            document.getElementById('modal-tags').value = '';
             document.getElementById('modal-account').value = trade.account_id || '';
             document.getElementById('modal-session').value = trade.session || '';
             document.getElementById('modal-date').value = trade.created_at ? trade.created_at.split('T')[0] : '';
@@ -1136,15 +1141,20 @@
             document.getElementById('modal-tp').value = trade.take_profit || '';
             document.getElementById('modal-status').value = trade.status || 'Closed';
             document.getElementById('modal-journal').value = trade.journal_entry || '';
+
             if (trade.confidence) setConfidence(trade.confidence);
             else resetConfidence();
+
+            // Clear image previews and file inputs
             document.getElementById('before-preview').src = '';
             document.getElementById('before-preview').classList.add('hidden');
             document.getElementById('before-placeholder').classList.remove('hidden');
             document.getElementById('after-preview').src = '';
             document.getElementById('after-preview').classList.add('hidden');
             document.getElementById('after-placeholder').classList.remove('hidden');
-            document.getElementById('submitTradeBtn').textContent = 'Update Trade';
+            document.getElementById('modal-before-image').value = '';
+            document.getElementById('modal-after-image').value = '';
+
             document.getElementById('tradeModal').classList.add('show');
         }
 
@@ -1449,37 +1459,64 @@
         }
 
         // ============================================================
-        // MODAL CONTROLS (unchanged)
+        // MODAL CONTROLS (fixed: reset all fields on open)
         // ============================================================
         function openModal() {
             document.getElementById('tradeModal').classList.add('show');
             document.getElementById('tradeModalTitle').textContent = 'Add New Trade';
             document.getElementById('submitTradeBtn').textContent = 'Log Trade';
             document.getElementById('editTradeId').value = '';
-            const now = new Date();
-            document.getElementById('modal-date').value = now.toISOString().split('T')[0];
-            document.getElementById('modal-time').value = now.toTimeString().slice(0,5);
-            resetConfidence();
-            document.getElementById('modal-session').value = '';
+
+            // Reset ALL form fields to empty/default
+            document.getElementById('modal-pair').value = '';
+            document.getElementById('modal-direction').value = 'BUY';
+            document.getElementById('modal-position_size').value = '';
+            document.getElementById('modal-entry').value = '';
+            document.getElementById('modal-exit').value = '';
+            document.getElementById('modal-risk_reward').value = '';
+            document.getElementById('modal-pnl').value = '';
+            document.getElementById('modal-emotion').value = '';
+            document.getElementById('modal-followed_plan').value = 'YES';
+            document.getElementById('modal-mistakes').value = '';
+            document.getElementById('modal-notes').value = '';
+            document.getElementById('modal-strategy').value = '';
+            document.getElementById('modal-tags').value = '';
             document.getElementById('modal-account').value = '';
-            document.getElementById('modal-before-image').value = '';
-            document.getElementById('modal-after-image').value = '';
+            document.getElementById('modal-session').value = '';
+            document.getElementById('modal-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('modal-time').value = new Date().toTimeString().slice(0,5);
             document.getElementById('modal-stop').value = '';
             document.getElementById('modal-tp').value = '';
             document.getElementById('modal-status').value = 'Closed';
             document.getElementById('modal-journal').value = '';
-            resetPreview('before'); resetPreview('after');
+
+            resetConfidence();
+            resetPreview('before');
+            resetPreview('after');
+
+            // Clear file inputs
+            document.getElementById('modal-before-image').value = '';
+            document.getElementById('modal-after-image').value = '';
         }
-        function closeModal() { document.getElementById('tradeModal').classList.remove('show'); }
+
+        function closeModal() {
+            document.getElementById('tradeModal').classList.remove('show');
+        }
+
         function resetPreview(prefix) {
             const img = document.getElementById(`${prefix}-preview`);
             const placeholder = document.getElementById(`${prefix}-placeholder`);
-            img.classList.add('hidden'); img.src = ''; placeholder.classList.remove('hidden');
+            img.classList.add('hidden');
+            img.src = '';
+            placeholder.classList.remove('hidden');
         }
+
         document.getElementById('addTradeBtn').addEventListener('click', openModal);
         document.getElementById('closeModalBtn').addEventListener('click', closeModal);
         document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
-        document.getElementById('tradeModal').addEventListener('click', (e) => { if (e.target === document.getElementById('tradeModal')) closeModal(); });
+        document.getElementById('tradeModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('tradeModal')) closeModal();
+        });
 
         function setupPreview(inputId, previewId, placeholderId) {
             const input = document.getElementById(inputId);
@@ -1492,7 +1529,9 @@
                     reader.onload = (e) => { preview.src = e.target.result; preview.classList.remove('hidden'); placeholder.classList.add('hidden'); };
                     reader.readAsDataURL(file);
                 } else {
-                    preview.src = ''; preview.classList.add('hidden'); placeholder.classList.remove('hidden');
+                    preview.src = '';
+                    preview.classList.add('hidden');
+                    placeholder.classList.remove('hidden');
                 }
             });
         }
