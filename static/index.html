@@ -95,6 +95,8 @@
         .header-accounts .account-selector .add-account-btn { background:var(--gold); color:#0a0a0a; border:none; padding:0.15rem 0.6rem; border-radius:0.5rem; font-size:0.6rem; font-weight:700; cursor:pointer; transition:all 0.2s; touch-action:manipulation; }
         @media (min-width: 768px) { .header-accounts .account-selector .add-account-btn { padding:0.2rem 0.75rem; font-size:0.7rem; } }
         .header-accounts .account-selector .add-account-btn:hover { background:var(--gold-light); transform:scale(1.05); }
+        .header-accounts .account-selector .manage-account-btn { background:var(--bg-body); border:1px solid var(--border-color); border-radius:0.5rem; padding:0.15rem 0.4rem; font-size:0.7rem; color:var(--gold); cursor:pointer; transition:background 0.2s; }
+        .header-accounts .account-selector .manage-account-btn:hover { background:rgba(212,168,83,0.1); }
         .header-accounts .metrics { display:flex; gap:0.5rem; font-size:0.6rem; flex-wrap:wrap; width:100%; justify-content:space-between; }
         @media (min-width: 640px) { .header-accounts .metrics { width:auto; gap:1rem; font-size:0.7rem; } }
         @media (min-width: 768px) { .header-accounts .metrics { gap:2rem; font-size:0.75rem; } }
@@ -186,6 +188,14 @@
         .watchlist-item .notes { color:var(--text-secondary); font-size:0.8rem; }
         .watchlist-item .remove-btn { color:#ff5555; cursor:pointer; background:none; border:none; font-size:1.2rem; }
         .watchlist-item .remove-btn:hover { transform:scale(1.2); }
+
+        /* Manage Accounts modal */
+        .account-list-item { display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border-color); }
+        .account-list-item .account-info { display:flex; flex-direction:column; }
+        .account-list-item .account-name { font-weight:600; }
+        .account-list-item .account-balance { font-size:0.8rem; color:var(--text-secondary); }
+        .account-list-item .delete-account-btn { background:#ff5555; color:white; border:none; padding:0.2rem 0.8rem; border-radius:0.5rem; font-size:0.7rem; cursor:pointer; transition:background 0.2s; }
+        .account-list-item .delete-account-btn:hover { background:#cc4444; }
     </style>
 </head>
 <body>
@@ -249,6 +259,7 @@
                         <option value="all">All</option>
                     </select>
                     <button class="add-account-btn" onclick="openAddAccountModal()">+ Add</button>
+                    <button class="manage-account-btn" onclick="openManageAccountsModal()" title="Manage Accounts">⚙️</button>
                     <span style="font-size:0.55rem;color:rgba(212,168,83,0.6);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Session:</span>
                     <select id="sessionFilter" onchange="applyFiltersAndUpdate()">
                         <option value="all">All</option>
@@ -583,7 +594,7 @@
         </div>
     </div>
 
-    <!-- ===== ADD ACCOUNT MODAL (unchanged) ===== -->
+    <!-- ===== ADD ACCOUNT MODAL ===== -->
     <div id="addAccountModal" class="modal-backdrop">
         <div class="modal-content slide-in" style="max-width:500px;">
             <button class="close" onclick="closeAddAccountModal()">&times;</button>
@@ -632,6 +643,17 @@
                     <button type="submit" class="btn-gold">Add Account</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ===== MANAGE ACCOUNTS MODAL ===== -->
+    <div id="manageAccountsModal" class="modal-backdrop">
+        <div class="modal-content slide-in" style="max-width:500px;">
+            <button class="close" onclick="closeManageAccountsModal()">&times;</button>
+            <h2>Manage Accounts</h2>
+            <div id="accountListContainer">
+                <!-- accounts will be listed here -->
+            </div>
         </div>
     </div>
 
@@ -780,6 +802,7 @@
                 if (!res.ok) throw new Error('Failed to fetch accounts');
                 allAccountsCache = await res.json();
                 populateAccountSelects();
+                renderAccountList(); // update manage accounts modal if open
             } catch (err) {
                 console.error('Account fetch error:', err);
                 if (err.message.includes('401')) logout();
@@ -830,6 +853,47 @@
         }
 
         // ============================================================
+        // MANAGE ACCOUNTS
+        // ============================================================
+        function openManageAccountsModal() {
+            renderAccountList();
+            document.getElementById('manageAccountsModal').classList.add('show');
+        }
+
+        function closeManageAccountsModal() {
+            document.getElementById('manageAccountsModal').classList.remove('show');
+        }
+
+        function renderAccountList() {
+            const container = document.getElementById('accountListContainer');
+            if (allAccountsCache.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-secondary);">No accounts found.</p>';
+                return;
+            }
+            container.innerHTML = allAccountsCache.map(acc => `
+                <div class="account-list-item">
+                    <div class="account-info">
+                        <span class="account-name">${acc.name}</span>
+                        <span class="account-balance">Starting Balance: $${acc.starting_balance}</span>
+                    </div>
+                    <button class="delete-account-btn" onclick="deleteAccount(${acc.id})">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        async function deleteAccount(accountId) {
+            if (!confirm('Delete this account and all its trades?')) return;
+            try {
+                const res = await apiFetch(`${API_URL}/accounts/${accountId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Delete failed');
+                await fetchAllData(); // refresh everything
+                renderAccountList(); // update modal
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        // ============================================================
         // FILTERS & UPDATE
         // ============================================================
         function applyFiltersAndUpdate() {
@@ -860,7 +924,7 @@
         }
 
         // ============================================================
-        // ACCOUNT CRUD (unchanged)
+        // ACCOUNT CRUD
         // ============================================================
         document.getElementById('accountForm').addEventListener('submit', async (e) => {
             e.preventDefault();
