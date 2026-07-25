@@ -3,12 +3,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Use persistent storage path on Railway (or fallback to local file)
+# Use local SQLite (no Supabase)
 DB_PATH = os.environ.get("DATABASE_PATH", "./journal.db")
-
-# Ensure the directory exists
 db_dir = os.path.dirname(DB_PATH)
-if db_dir:
+if db_dir and not os.path.exists(db_dir):
     os.makedirs(db_dir, exist_ok=True)
 
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
@@ -16,7 +14,7 @@ SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocompose=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
