@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Date  # <-- ADDED Date
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -62,6 +63,9 @@ class Trade(Base):
     # NEW FIELDS
     status = Column(String, default="Closed")  # "Open" or "Closed"
     journal_entry = Column(Text, nullable=True)  # Long-form reflection
+
+    # ✅ ADD THIS LINE – The fix for the date!
+    trade_date = Column(Date, nullable=True)  # <-- ADDED
 
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

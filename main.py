@@ -19,6 +19,7 @@ import csv
 import io
 import json
 import re
+from collections import Counter
 
 # ---------- CONFIG ----------
 UPLOAD_DIR = "static/uploads"
@@ -375,6 +376,7 @@ def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Dep
     if existing:
         existing.email = settings.email
         existing.frequency = settings.frequency
+        # If you want to allow updating send_day, add it to schema and update here
     else:
         existing = models.ReportSetting(**settings.dict(), user_id=current_user.id)
         db.add(existing)
@@ -415,40 +417,72 @@ def generate_report(trades):
     html += f"<p>Total Trades: {total} | Wins: {wins} | Losses: {losses} | Win Rate: {win_rate:.1f}%</p>"
     html += f"<p>Net P&L: ${pnl:.2f}</p>"
     # Add top symbols
-    from collections import Counter
     pairs = [t.pair for t in trades]
     top_pairs = Counter(pairs).most_common(3)
     html += "<p>Top Traded Pairs: " + ", ".join([f"{p[0]} ({p[1]})" for p in top_pairs]) + "</p>"
     return html
 
 
+# UPDATED: Scheduler checks for Saturday (weekday=5) and only sends once per day.
 def scheduled_email_job():
     from database import SessionLocal
     db = SessionLocal()
     try:
-        # Get all users who have weekly reports enabled
+        today_weekday = datetime.utcnow().weekday()  # Monday=0, Sunday=6
+        # Saturday = 5
+        if today_weekday != 5:
+            return  # Only run on Saturdays
+
         users_with_reports = db.query(models.User).join(models.ReportSetting).all()
         for user in users_with_reports:
             settings = db.query(models.ReportSetting).filter(models.ReportSetting.user_id == user.id).first()
-            if settings and settings.frequency == "weekly":
-                # Check if we should send (e.g., once a week)
-                if settings.last_sent is None or (datetime.utcnow() - settings.last_sent).days >= 7:
-                    trades = db.query(models.Trade).filter(
-                        models.Trade.user_id == user.id,
-                        models.Trade.created_at > datetime.utcnow() - timedelta(days=7)
-                    ).all()
-                    report = generate_report(trades)
-                    send_email_report(settings.email, report)
-                    settings.last_sent = datetime.utcnow()
-                    db.commit()
+            if not settings:
+                continue
+            if settings.frequency != 'weekly':
+                continue
+
+            # Check if we already sent today (avoid multiple sends)
+            today_str = datetime.utcnow().date().isoformat()
+            if settings.last_sent and settings.last_sent.date().isoformat() == today_str:
+                continue
+
+            trades = db.query(models.Trade).filter(
+                models.Trade.user_id == user.id,
+                models.Trade.created_at > datetime.utcnow() - timedelta(days=7)
+            ).all()
+            report = generate_report(trades)
+            try:
+                send_email_report(settings.email, report)
+                settings.last_sent = datetime.utcnow()
+                db.commit()
+                print(f"Sent weekly report to {settings.email}")
+            except Exception as e:
+                print(f"Failed to send email to {settings.email}: {e}")
     finally:
         db.close()
 
 
-# Start the scheduler (runs every 24 hours)
-scheduler = BackgroundScheduler()
-scheduler.add_job(scheduled_email_job, "interval", hours=24)
-scheduler.start()
+# ---------- MANUAL TEST ENDPOINT ----------
+@app.post("/send-test-report/")
+async def send_test_report(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Get the user's report settings
+    settings = db.query(models.ReportSetting).filter(models.ReportSetting.user_id == current_user.id).first()
+    if not settings:
+        raise HTTPException(404, "No report settings found. Please set your email first.")
+    if not settings.email:
+        raise HTTPException(400, "No email address set in your report settings.")
+
+    # Generate the report (last 7 days)
+    trades = db.query(models.Trade).filter(
+        models.Trade.user_id == current_user.id,
+        models.Trade.created_at > datetime.utcnow() - timedelta(days=7)
+    ).all()
+    report = generate_report(trades)
+    try:
+        send_email_report(settings.email, report)
+        return {"message": "Test report sent successfully!"}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to send: {str(e)}")
 
 
 # ---------- STATS (with auth) ----------
@@ -510,3 +544,9 @@ def export_csv(db: Session = Depends(get_db), current_user: models.User = Depend
 @app.get("/")
 async def read_root():
     return FileResponse("static/index.html")
+
+
+# ---------- SCHEDULER START ----------
+scheduler = BackgroundScheduler()
+scheduler.add_job(scheduled_email_job, "interval", hours=24)
+scheduler.start()
