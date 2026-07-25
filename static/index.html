@@ -31,7 +31,8 @@
         .btn-gold { background-color: var(--gold); color: #0a0a0a; font-weight: 700; padding: 0.7rem 1.5rem; border-radius: 0.75rem; transition: all 0.2s ease; border: none; cursor: pointer; font-size:0.9rem; touch-action:manipulation; }
         .btn-gold:hover { background-color: var(--gold-light); transform: scale(1.02); box-shadow: 0 0 20px var(--gold-glow); }
         .btn-gold:active { transform: scale(0.97); }
-        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 1rem; box-shadow: 0 8px 32px rgba(0,0,0,0.3); padding: 1rem; }
+        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 1rem; box-shadow: 0 8px 32px rgba(0,0,0,0.3); padding: 1rem; transition: all 0.3s ease; }
+        .card:hover { transform: translateY(-4px); border-color: var(--gold); box-shadow: 0 12px 40px rgba(212,168,83,0.15); }
         @media (min-width: 768px) { .card { padding: 1.25rem; } }
         .nav-item { transition: all 0.2s ease; border-radius: 0.75rem; padding: 0.7rem 1rem; cursor: pointer; color: rgba(212,168,83,0.5); display:flex; align-items:center; gap:0.75rem; font-weight:600; font-size:0.9rem; width:100%; border:none; background:transparent; touch-action:manipulation; }
         .nav-item:hover { background-color: rgba(212,168,83,0.1); color: var(--gold-light); transform: translateX(4px); }
@@ -51,11 +52,47 @@
         @media (min-width: 768px) { .preview-container { width:80px; height:80px; } }
         .preview-container img { width:100%; height:100%; object-fit:cover; cursor:pointer; }
         .preview-container .placeholder { font-size:2rem; color:var(--gold); opacity:0.3; }
-        .calendar-day { transition:all 0.15s; border-radius:0.5rem; padding:0.2rem; text-align:center; font-size:0.6rem; background:var(--bg-body); border:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:space-between; min-height:30px; }
+        /* === CALENDAR DAY STYLES – ENHANCED === */
+        .calendar-day {
+            transition: all 0.25s ease;
+            border-radius: 0.5rem;
+            padding: 0.2rem;
+            text-align: center;
+            font-size: 0.6rem;
+            background: var(--bg-body);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 30px;
+            cursor: default;
+        }
         @media (min-width: 768px) { .calendar-day { font-size:0.7rem; min-height:40px; padding:0.25rem; } }
-        .calendar-day.positive { background-color:rgba(212,168,83,0.15); border-color:var(--gold); }
-        .calendar-day.negative { background-color:rgba(255,80,80,0.15); border-color:#ff5555; }
-        .trade-row:hover { background-color:rgba(212,168,83,0.05); }
+        .calendar-day.positive {
+            background-color: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+        }
+        .calendar-day.negative {
+            background-color: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+        }
+        .calendar-day:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px var(--gold-glow);
+            z-index: 2;
+        }
+        .calendar-day.positive:hover {
+            background-color: rgba(34, 197, 94, 0.35);
+            border-color: #22c55e;
+            box-shadow: 0 0 25px rgba(34,197,94,0.3);
+        }
+        .calendar-day.negative:hover {
+            background-color: rgba(239, 68, 68, 0.35);
+            border-color: #ef4444;
+            box-shadow: 0 0 25px rgba(239,68,68,0.3);
+        }
+        /* === END CALENDAR === */
+        .trade-row:hover { background-color: rgba(212,168,83,0.05); }
         .sidebar { position:fixed; left:0; top:0; bottom:0; width:220px; background-color:var(--bg-card); border-right:1px solid var(--border-color); display:flex; flex-direction:column; transition:transform 0.3s ease; overflow-y:auto; z-index:40; transform:translateX(-100%); }
         @media (min-width: 1024px) { .sidebar { transform:translateX(0); width:64px; } .sidebar:hover { width:200px; } .sidebar .hidden-text { display:none; } .sidebar:hover .hidden-text { display:inline; } }
         .sidebar.open { transform:translateX(0); }
@@ -1404,19 +1441,69 @@
             document.getElementById('metric-worst-trade').style.color = '#ff5555';
         }
 
+        // ============================================================
+        // RENDER EQUITY CURVE – WITH GRADIENT FILL (red->green) & GOLDEN LINE
+        // ============================================================
         function renderEquityCurve(trades, baseCapital) {
             const ctx = document.getElementById('equityCurveChart').getContext('2d');
             let running = baseCapital, labels = ['Start'], data = [baseCapital];
             trades.forEach((t,i) => { running += t.pnl; labels.push(`Trade #${i+1}`); data.push(running); });
             if (trades.length === 0) { labels = ['Start', 'Current']; data = [baseCapital, baseCapital]; }
+
             const isDark = document.documentElement.classList.contains('dark');
             const gridColor = isDark ? 'rgba(212,168,83,0.1)' : 'rgba(0,0,0,0.1)';
             const textColor = isDark ? '#d4a853' : '#4a3a1a';
+
+            // Create gradient from red (bottom) to green (top)
+            const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+            gradient.addColorStop(0, '#22c55e');   // green at top
+            gradient.addColorStop(0.5, '#d4a853'); // gold in middle
+            gradient.addColorStop(1, '#ef4444');   // red at bottom
+
             if (equityChartInstance) equityChartInstance.destroy();
+
             equityChartInstance = new Chart(ctx, {
                 type: 'line',
-                data: { labels, datasets: [{ label: 'Equity ($)', data, borderColor: '#d4a853', backgroundColor: 'rgba(212,168,83,0.08)', borderWidth: 2, fill: true, tension: 0.2, pointRadius: 3, pointBackgroundColor: '#d4a853' }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 8 } } }, y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 8 } } } } }
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Equity ($)',
+                        data: data,
+                        borderColor: '#d4a853',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#d4a853',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `$${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 8 } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 8 } }
+                        }
+                    }
+                }
             });
         }
 
@@ -1445,15 +1532,17 @@
             for (let day=1; day<=total; day++) {
                 const key = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
                 const cell = document.createElement('div');
-                let cls = 'day-cell calendar-day', pnlText = '';
+                let cls = 'day-cell calendar-day';
+                let pnlText = '';
+                let pnlValue = 0;
                 if (dailyPnl[key] !== undefined) {
-                    const pnl = dailyPnl[key];
-                    if (pnl > 0) { cls += ' positive'; pnlText = `+$${pnl.toFixed(0)}`; }
-                    else if (pnl < 0) { cls += ' negative'; pnlText = `-$${Math.abs(pnl).toFixed(0)}`; }
+                    pnlValue = dailyPnl[key];
+                    if (pnlValue > 0) { cls += ' positive'; pnlText = `+$${pnlValue.toFixed(0)}`; }
+                    else if (pnlValue < 0) { cls += ' negative'; pnlText = `-$${Math.abs(pnlValue).toFixed(0)}`; }
                     else pnlText = '$0';
                 }
                 cell.className = cls;
-                cell.innerHTML = `<span style="align-self:flex-start;color:rgba(212,168,83,0.4);font-size:0.5rem;">${day}</span><span style="font-family:'Major Mono Display',monospace;font-weight:700;font-size:0.5rem;${dailyPnl[key] !== undefined ? (dailyPnl[key] > 0 ? 'color:var(--gold);' : 'color:#ff5555;') : 'color:rgba(212,168,83,0.3);'}">${pnlText}</span>`;
+                cell.innerHTML = `<span style="align-self:flex-start;color:rgba(212,168,83,0.4);font-size:0.5rem;">${day}</span><span style="font-family:'Major Mono Display',monospace;font-weight:700;font-size:0.5rem;${pnlValue !== undefined ? (pnlValue > 0 ? 'color:#22c55e;' : pnlValue < 0 ? 'color:#ef4444;' : 'color:var(--text-secondary);') : 'color:rgba(212,168,83,0.3);'}">${pnlText}</span>`;
                 grid.appendChild(cell);
             }
         }
