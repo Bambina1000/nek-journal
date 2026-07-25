@@ -1459,130 +1459,121 @@
         // RENDER EQUITY CURVE – FIXED: chronological order, curvy line, safe segment coloring
         // ============================================================
         function renderEquityCurve(trades, baseCapital) {
-            const ctx = document.getElementById('equityCurveChart').getContext('2d');
+    const ctx = document.getElementById('equityCurveChart').getContext('2d');
 
-            // 1. Sort trades by date (oldest first)
-            const sortedTrades = [...trades].sort((a, b) => {
-                const dateA = a.trade_date || a.created_at;
-                const dateB = b.trade_date || b.created_at;
-                return new Date(dateA) - new Date(dateB);
-            });
+    // 1. Sort trades by date (oldest first)
+    const sortedTrades = [...trades].sort((a, b) => {
+        const dateA = a.trade_date || a.created_at;
+        const dateB = b.trade_date || b.created_at;
+        return new Date(dateA) - new Date(dateB);
+    });
 
-            let running = baseCapital;
-            let labels = ['Start'];
-            let data = [baseCapital];
+    let running = baseCapital;
+    let labels = ['Start'];
+    let data = [baseCapital];
 
-            // 2. Build equity curve in chronological order
-            sortedTrades.forEach((t, i) => {
-                running += t.pnl;
-                labels.push(`Trade #${i+1}`);
-                data.push(running);
-            });
+    // 2. Build equity curve in chronological order
+    sortedTrades.forEach((t, i) => {
+        running += t.pnl;
+        labels.push(`Trade #${i+1}`);
+        data.push(running);
+    });
 
-            // Ensure at least 2 data points so the chart can draw a segment
-            if (data.length < 2) {
-                // If no trades, show flat line from Start to Current
-                labels = ['Start', 'Current'];
-                data = [baseCapital, baseCapital];
+    // Ensure at least 2 data points so the chart can draw a line
+    if (data.length < 2) {
+        labels = ['Start', 'Current'];
+        data = [baseCapital, baseCapital];
+    }
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const gridColor = isDark ? 'rgba(212,168,83,0.1)' : 'rgba(0,0,0,0.1)';
+    const textColor = isDark ? '#d4a853' : '#4a3a1a';
+
+    if (equityChartInstance) equityChartInstance.destroy();
+
+    // Create a gradient fill that goes from red (bottom) to green (top)
+    const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+    gradient.addColorStop(0, '#22c55e');   // green at top
+    gradient.addColorStop(0.5, '#d4a853'); // gold in middle
+    gradient.addColorStop(1, '#ef4444');   // red at bottom
+
+    equityChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Equity ($)',
+                data: data,
+                borderColor: '#d4a853',      // gold line always
+                backgroundColor: gradient,    // gradient fill
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,                // smooth curve
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                pointBackgroundColor: data.map(v => v >= baseCapital ? '#22c55e' : '#ef4444'),
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            const diff = value - baseCapital;
+                            const sign = diff >= 0 ? '+' : '';
+                            return `$${value.toFixed(2)} (${sign}$${diff.toFixed(2)})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, font: { size: 8 } }
+                },
+                y: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, font: { size: 8 } }
+                }
             }
-
-            const isDark = document.documentElement.classList.contains('dark');
-            const gridColor = isDark ? 'rgba(212,168,83,0.1)' : 'rgba(0,0,0,0.1)';
-            const textColor = isDark ? '#d4a853' : '#4a3a1a';
-
-            if (equityChartInstance) equityChartInstance.destroy();
-
-            // 3. Create dataset with segment-based coloring for a smooth curvy line
-            equityChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Equity ($)',
-                        data: data,
-                        borderWidth: 3,
-                        borderColor: '#d4a853', // fallback gold
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 5,
-                        pointHoverRadius: 7,
-                        pointBackgroundColor: data.map(v => v >= baseCapital ? '#22c55e' : '#ef4444'),
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        segment: {
-                            borderColor: function(context) {
-                                // Safety check: ensure we have both current and previous points
-                                if (!context || !context.p0 || !context.p0.parsed || context.p0.parsed.y === undefined) {
-                                    return '#d4a853';
-                                }
-                                const current = context.parsed.y;
-                                const previous = context.p0.parsed.y;
-                                if (current >= baseCapital && previous >= baseCapital) return '#22c55e';
-                                if (current < baseCapital && previous < baseCapital) return '#ef4444';
-                                // Transition segment – use gold
-                                return '#d4a853';
-                            }
-                        }
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.y;
-                                    const diff = value - baseCapital;
-                                    const sign = diff >= 0 ? '+' : '';
-                                    return `$${value.toFixed(2)} (${sign}$${diff.toFixed(2)})`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: gridColor },
-                            ticks: { color: textColor, font: { size: 8 } }
-                        },
-                        y: {
-                            grid: { color: gridColor },
-                            ticks: { color: textColor, font: { size: 8 } }
-                        }
-                    }
-                },
-                plugins: [{
-                    id: 'baseline',
-                    afterDraw: function(chart) {
-                        const yScale = chart.scales.y;
-                        const xScale = chart.scales.x;
-                        const yPos = yScale.getPixelForValue(baseCapital);
-                        const ctx = chart.ctx;
-                        // Dashed baseline
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.setLineDash([5, 5]);
-                        ctx.strokeStyle = '#d4a853';
-                        ctx.lineWidth = 1.5;
-                        ctx.globalAlpha = 0.5;
-                        ctx.moveTo(xScale.left, yPos);
-                        ctx.lineTo(xScale.right, yPos);
-                        ctx.stroke();
-                        ctx.restore();
-                        // Label
-                        ctx.save();
-                        ctx.fillStyle = '#d4a853';
-                        ctx.globalAlpha = 0.7;
-                        ctx.font = '8px "Major Mono Display", monospace';
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'bottom';
-                        ctx.fillText(`Start $${baseCapital.toFixed(0)}`, xScale.left + 4, yPos - 4);
-                        ctx.restore();
-                    }
-                }]
-            });
-        }
+        },
+        plugins: [{
+            id: 'baseline',
+            afterDraw: function(chart) {
+                const yScale = chart.scales.y;
+                const xScale = chart.scales.x;
+                const yPos = yScale.getPixelForValue(baseCapital);
+                const ctx = chart.ctx;
+                // Dashed baseline
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#d4a853';
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = 0.5;
+                ctx.moveTo(xScale.left, yPos);
+                ctx.lineTo(xScale.right, yPos);
+                ctx.stroke();
+                ctx.restore();
+                // Label
+                ctx.save();
+                ctx.fillStyle = '#d4a853';
+                ctx.globalAlpha = 0.7;
+                ctx.font = '8px "Major Mono Display", monospace';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(`Start $${baseCapital.toFixed(0)}`, xScale.left + 4, yPos - 4);
+                ctx.restore();
+            }
+        }]
+    });
+}
 
         // ============================================================
         // CALENDAR
