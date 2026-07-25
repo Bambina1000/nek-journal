@@ -92,7 +92,7 @@
             box-shadow: 0 0 25px rgba(239,68,68,0.3);
         }
         /* === END CALENDAR === */
-        .trade-row:hover { background-color: rgba(212,168,83,0.05); }
+        .trade-row:hover { background-color: rgba(212,168,83,0.05); transform: scale(1.01); transition: all 0.2s; }
         .sidebar { position:fixed; left:0; top:0; bottom:0; width:220px; background-color:var(--bg-card); border-right:1px solid var(--border-color); display:flex; flex-direction:column; transition:transform 0.3s ease; overflow-y:auto; z-index:40; transform:translateX(-100%); }
         @media (min-width: 1024px) { .sidebar { transform:translateX(0); width:64px; } .sidebar:hover { width:200px; } .sidebar .hidden-text { display:none; } .sidebar:hover .hidden-text { display:inline; } }
         .sidebar.open { transform:translateX(0); }
@@ -176,8 +176,8 @@
         @media (min-width: 768px) { table td { padding:0.75rem; } }
         .badge { padding:0.1rem 0.3rem; border-radius:9999px; font-size:0.55rem; font-weight:700; display:inline-block; }
         @media (min-width: 768px) { .badge { padding:0.125rem 0.5rem; font-size:0.65rem; } }
-        .badge-buy { background:rgba(212,168,83,0.2); color:var(--gold); border:1px solid rgba(212,168,83,0.3); }
-        .badge-sell { background:var(--bg-body); color:rgba(212,168,83,0.6); border:1px solid var(--border-color); }
+        .badge-buy { background:rgba(34,197,94,0.2); color:#22c55e; border:1px solid rgba(34,197,94,0.3); }
+        .badge-sell { background:rgba(239,68,68,0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.3); }
         .badge-session { font-size:0.5rem; padding:0.05rem 0.3rem; border-radius:9999px; background:rgba(212,168,83,0.1); border:1px solid var(--border-color); color:var(--text-secondary); }
         @media (min-width: 768px) { .badge-session { font-size:0.6rem; padding:0.1rem 0.4rem; } }
         .no-trades { text-align:center; padding:1rem; color:rgba(212,168,83,0.5); font-size:0.8rem; }
@@ -233,6 +233,10 @@
         .account-list-item .account-balance { font-size:0.8rem; color:var(--text-secondary); }
         .account-list-item .delete-account-btn { background:#ff5555; color:white; border:none; padding:0.2rem 0.8rem; border-radius:0.5rem; font-size:0.7rem; cursor:pointer; transition:background 0.2s; }
         .account-list-item .delete-account-btn:hover { background:#cc4444; }
+
+        /* Metric number colors */
+        .metric-positive { color: #22c55e; }
+        .metric-negative { color: #ef4444; }
     </style>
 </head>
 <body>
@@ -327,11 +331,11 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem;text-align:center;">
                             <div style="background:var(--bg-body);padding:0.3rem;border-radius:0.4rem;border:1px solid var(--border-color);">
                                 <p style="font-size:0.5rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Net P/L</p>
-                                <p id="metric-net-pnl" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:var(--gold);margin-top:0.1rem;">$0.00</p>
+                                <p id="metric-net-pnl" class="mono-number" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;margin-top:0.1rem;">$0.00</p>
                             </div>
                             <div style="background:var(--bg-body);padding:0.3rem;border-radius:0.4rem;border:1px solid var(--border-color);">
                                 <p style="font-size:0.5rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Expect.</p>
-                                <p id="metric-expectancy" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:var(--gold);margin-top:0.1rem;">$0.00</p>
+                                <p id="metric-expectancy" class="mono-number" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;margin-top:0.1rem;">$0.00</p>
                             </div>
                             <div style="background:var(--bg-body);padding:0.3rem;border-radius:0.4rem;border:1px solid var(--border-color);">
                                 <p style="font-size:0.5rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">P Factor</p>
@@ -1108,7 +1112,7 @@
         }
 
         // ============================================================
-        // RENDER TABLE (added Status column)
+        // RENDER TABLE (with green/red P&L, direction badges, and hover)
         // ============================================================
         function renderTable(trades) {
             const tbody = document.getElementById('tradesTableBody');
@@ -1118,8 +1122,9 @@
                 return;
             }
             trades.slice().reverse().forEach(t => {
-                const pnlColor = t.pnl >= 0 ? 'var(--gold)' : '#ff5555';
-                const pnlSign = t.pnl >= 0 ? '+' : '';
+                const isWin = t.pnl >= 0;
+                const pnlColor = isWin ? '#22c55e' : '#ef4444';
+                const pnlSign = isWin ? '+' : '';
                 const accountName = t.account ? t.account.name : (t.account_id ? 'Deleted' : '');
                 const tr = document.createElement('tr');
                 tr.className = 'trade-row';
@@ -1133,7 +1138,7 @@
                     <td style="font-size:0.6rem;color:var(--text-secondary);">${accountName}</td>
                     <td style="font-family:'Major Mono Display',monospace;font-size:0.6rem;color:${t.confidence ? 'var(--gold)' : 'var(--text-secondary)'};">${t.confidence || '-'}</td>
                     <td><span class="badge badge-session">${t.session || '-'}</span></td>
-                    <td><span class="badge" style="background:${t.status === 'Open' ? 'rgba(50,200,100,0.2)' : 'var(--bg-body)'};color:${t.status === 'Open' ? '#32c864' : 'var(--text-secondary)'};">${t.status || 'Closed'}</span></td>
+                    <td><span class="badge" style="background:${t.status === 'Open' ? 'rgba(34,197,94,0.2)' : 'var(--bg-body)'};color:${t.status === 'Open' ? '#22c55e' : 'var(--text-secondary)'};">${t.status || 'Closed'}</span></td>
                     <td style="text-align:center;">
                         <div class="action-btns">
                             <button class="edit-btn" onclick="editTrade(${t.id})" title="Edit">✏️</button>
@@ -1344,7 +1349,7 @@
         }
 
         // ============================================================
-        // METRICS (unchanged)
+        // METRICS (updated with green/red for P&L and Expectancy)
         // ============================================================
         function updateAccountMetrics(trades, baseCapital) {
             let totalPnl = trades.reduce((acc, t) => acc + t.pnl, 0);
@@ -1353,10 +1358,10 @@
             document.getElementById('account-balance').textContent = `$${currentBalance.toFixed(2)}`;
             const pnlEl = document.getElementById('account-pnl');
             pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`;
-            pnlEl.style.color = totalPnl >= 0 ? 'var(--gold)' : '#ff5555';
+            pnlEl.style.color = totalPnl >= 0 ? '#22c55e' : '#ef4444';
             const pctEl = document.getElementById('account-pnl-pct');
             pctEl.textContent = `${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(1)}%`;
-            pctEl.style.color = returnPct >= 0 ? 'var(--gold)' : '#ff5555';
+            pctEl.style.color = returnPct >= 0 ? '#22c55e' : '#ef4444';
             renderEquityCurve(trades, baseCapital);
         }
 
@@ -1400,13 +1405,13 @@
                     let i = sorted.length - 1;
                     while (i >= 0 && sorted[i].pnl > 0) { currentStreak++; i--; }
                     document.getElementById('metric-current-streak').textContent = `${currentStreak} W`;
-                    document.getElementById('metric-current-streak').style.color = 'var(--gold)';
+                    document.getElementById('metric-current-streak').style.color = '#22c55e';
                 } else if (lastTrade.pnl < 0) {
                     let lossStreak = 0;
                     let j = sorted.length - 1;
                     while (j >= 0 && sorted[j].pnl < 0) { lossStreak++; j--; }
                     document.getElementById('metric-current-streak').textContent = `${lossStreak} L`;
-                    document.getElementById('metric-current-streak').style.color = '#ff5555';
+                    document.getElementById('metric-current-streak').style.color = '#ef4444';
                 } else {
                     document.getElementById('metric-current-streak').textContent = '0';
                     document.getElementById('metric-current-streak').style.color = 'var(--text-secondary)';
@@ -1424,10 +1429,15 @@
             let std = Math.sqrt(pnls.reduce((s, v) => s + (v - mean) ** 2, 0) / pnls.length);
             let sharpe = std === 0 ? 0 : mean / std;
 
-            document.getElementById('metric-net-pnl').textContent = `${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)}`;
-            document.getElementById('metric-net-pnl').style.color = netPnl >= 0 ? 'var(--gold)' : '#ff5555';
-            document.getElementById('metric-expectancy').textContent = `$${expectancy.toFixed(2)}`;
-            document.getElementById('metric-expectancy').style.color = expectancy >= 0 ? 'var(--gold)' : '#ff5555';
+            // Set Net P&L and Expectancy with green/red
+            const netPnlEl = document.getElementById('metric-net-pnl');
+            netPnlEl.textContent = `${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)}`;
+            netPnlEl.style.color = netPnl >= 0 ? '#22c55e' : '#ef4444';
+
+            const expEl = document.getElementById('metric-expectancy');
+            expEl.textContent = `$${expectancy.toFixed(2)}`;
+            expEl.style.color = expectancy >= 0 ? '#22c55e' : '#ef4444';
+
             document.getElementById('metric-profit-factor').textContent = profitFactor.toFixed(2);
             document.getElementById('metric-win-rate').textContent = `${winRate.toFixed(1)}%`;
             document.getElementById('metric-avg-rr').textContent = `${avgRr.toFixed(1)}R`;
@@ -1436,9 +1446,9 @@
             document.getElementById('metric-avg-loss').textContent = `$${avgLoss.toFixed(2)}`;
             document.getElementById('metric-sharpe').textContent = sharpe.toFixed(2);
             document.getElementById('metric-best-trade').textContent = `$${bestTrade.pnl.toFixed(2)}`;
-            document.getElementById('metric-best-trade').style.color = 'var(--gold)';
+            document.getElementById('metric-best-trade').style.color = '#22c55e';
             document.getElementById('metric-worst-trade').textContent = `$${worstTrade.pnl.toFixed(2)}`;
-            document.getElementById('metric-worst-trade').style.color = '#ff5555';
+            document.getElementById('metric-worst-trade').style.color = '#ef4444';
         }
 
         // ============================================================
@@ -1508,7 +1518,7 @@
         }
 
         // ============================================================
-        // CALENDAR (unchanged)
+        // CALENDAR
         // ============================================================
         function changeMonth(delta) {
             currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
@@ -1644,7 +1654,7 @@
         }
 
         // ============================================================
-        // ANALYTICS CHARTS (unchanged)
+        // ANALYTICS CHARTS (colors updated for positive/negative)
         // ============================================================
         function renderAnalytics(trades) {
             if (!document.getElementById('view-analytics').classList.contains('active')) return;
@@ -1711,38 +1721,147 @@
 
             strategyChart = new Chart(document.getElementById('strategyChart'), {
                 type: 'bar',
-                data: { labels: strategyLabels.length ? strategyLabels : ['No Data'], datasets: [{ label: 'P&L by Strategy', data: strategyLabels.length ? strategyData : [0], backgroundColor: strategyData.map(v => v >= 0 ? '#d4a853' : '#ff5555'), borderColor: '#d4a853', borderWidth: 1 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } } } }
+                data: {
+                    labels: strategyLabels.length ? strategyLabels : ['No Data'],
+                    datasets: [{
+                        label: 'P&L by Strategy',
+                        data: strategyLabels.length ? strategyData : [0],
+                        backgroundColor: strategyData.map(v => v >= 0 ? '#22c55e' : '#ef4444'),
+                        borderColor: '#d4a853',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }
+                    }
+                }
             });
             monthlyChart = new Chart(document.getElementById('monthlyChart'), {
                 type: 'bar',
-                data: { labels: months.length ? months : ['No Data'], datasets: [{ label: 'Monthly P&L', data: months.length ? monthlyData : [0], backgroundColor: monthlyData.map(v => v >= 0 ? '#d4a853' : '#ff5555'), borderColor: '#d4a853', borderWidth: 1 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } } } }
+                data: {
+                    labels: months.length ? months : ['No Data'],
+                    datasets: [{
+                        label: 'Monthly P&L',
+                        data: months.length ? monthlyData : [0],
+                        backgroundColor: monthlyData.map(v => v >= 0 ? '#22c55e' : '#ef4444'),
+                        borderColor: '#d4a853',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }
+                    }
+                }
             });
             winRateChart = new Chart(document.getElementById('winRateChart'), {
                 type: 'doughnut',
-                data: { labels: ['Wins', 'Losses', 'Flat'], datasets: [{ data: [wins, losses, flat], backgroundColor: ['#d4a853', '#ff5555', '#888888'], borderColor: '#141414', borderWidth: 2 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { size: 8 } } } } }
+                data: {
+                    labels: ['Wins', 'Losses', 'Flat'],
+                    datasets: [{ data: [wins, losses, flat], backgroundColor: ['#22c55e', '#ef4444', '#888888'], borderColor: '#141414', borderWidth: 2 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { size: 8 } } } }
+                }
             });
             sessionChart = new Chart(document.getElementById('sessionChart'), {
                 type: 'bar',
-                data: { labels: sessionLabels.length ? sessionLabels : ['No Data'], datasets: [{ label: 'P&L by Session', data: sessionLabels.length ? sessionData : [0], backgroundColor: sessionData.map(v => v >= 0 ? '#d4a853' : '#ff5555'), borderColor: '#d4a853', borderWidth: 1 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } } } }
+                data: {
+                    labels: sessionLabels.length ? sessionLabels : ['No Data'],
+                    datasets: [{
+                        label: 'P&L by Session',
+                        data: sessionLabels.length ? sessionData : [0],
+                        backgroundColor: sessionData.map(v => v >= 0 ? '#22c55e' : '#ef4444'),
+                        borderColor: '#d4a853',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }
+                    }
+                }
             });
             distributionChart = new Chart(document.getElementById('distributionChart'), {
                 type: 'bar',
-                data: { labels: ['Wins', 'Losses', 'Flat'], datasets: [{ label: 'Trade Count', data: [wins, losses, flat], backgroundColor: ['#d4a853', '#ff5555', '#888888'], borderColor: '#d4a853', borderWidth: 1 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, font: { size: 8 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { size: 8 } }, grid: { color: gridColor } } } }
+                data: {
+                    labels: ['Wins', 'Losses', 'Flat'],
+                    datasets: [{
+                        label: 'Trade Count',
+                        data: [wins, losses, flat],
+                        backgroundColor: ['#22c55e', '#ef4444', '#888888'],
+                        borderColor: '#d4a853',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 8 } }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor, font: { size: 8 } }, grid: { color: gridColor } }
+                    }
+                }
             });
             rMultipleChart = new Chart(document.getElementById('rMultipleChart'), {
                 type: 'bar',
-                data: { labels: rLabels, datasets: [{ label: 'Number of Trades', data: rData, backgroundColor: '#d4a853', borderColor: '#d4a853', borderWidth: 1 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } } } }
+                data: {
+                    labels: rLabels,
+                    datasets: [{
+                        label: 'Number of Trades',
+                        data: rData,
+                        backgroundColor: '#d4a853',
+                        borderColor: '#d4a853',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }
+                    }
+                }
             });
             hourlyChart = new Chart(document.getElementById('hourlyChart'), {
                 type: 'bar',
-                data: { labels: hourLabels, datasets: [{ label: 'P&L by Hour', data: hourlyData, backgroundColor: hourlyData.map(v => v >= 0 ? '#d4a853' : '#ff5555'), borderColor: '#d4a853', borderWidth: 1 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, font: { size: 6 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } } } }
+                data: {
+                    labels: hourLabels,
+                    datasets: [{
+                        label: 'P&L by Hour',
+                        data: hourlyData,
+                        backgroundColor: hourlyData.map(v => v >= 0 ? '#22c55e' : '#ef4444'),
+                        borderColor: '#d4a853',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: textColor, font: { size: 6 } }, grid: { color: gridColor } },
+                        y: { ticks: { color: textColor, font: { size: 7 } }, grid: { color: gridColor } }
+                    }
+                }
             });
         }
 
