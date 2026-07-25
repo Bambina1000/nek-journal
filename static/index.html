@@ -1456,7 +1456,7 @@
         }
 
         // ============================================================
-        // RENDER EQUITY CURVE – FIXED: chronological order, curvy line, green/red
+        // RENDER EQUITY CURVE – FIXED: chronological order, curvy line, safe segment coloring
         // ============================================================
         function renderEquityCurve(trades, baseCapital) {
             const ctx = document.getElementById('equityCurveChart').getContext('2d');
@@ -1479,7 +1479,9 @@
                 data.push(running);
             });
 
-            if (sortedTrades.length === 0) {
+            // Ensure at least 2 data points so the chart can draw a segment
+            if (data.length < 2) {
+                // If no trades, show flat line from Start to Current
                 labels = ['Start', 'Current'];
                 data = [baseCapital, baseCapital];
             }
@@ -1498,10 +1500,10 @@
                     datasets: [{
                         label: 'Equity ($)',
                         data: data,
-                        borderWidth: 3,               // thicker line
-                        borderColor: '#d4a853',       // fallback (gold)
+                        borderWidth: 3,
+                        borderColor: '#d4a853', // fallback gold
                         fill: false,
-                        tension: 0.4,                 // SMOOTH CURVY LINE
+                        tension: 0.4,
                         pointRadius: 5,
                         pointHoverRadius: 7,
                         pointBackgroundColor: data.map(v => v >= baseCapital ? '#22c55e' : '#ef4444'),
@@ -1509,6 +1511,10 @@
                         pointBorderWidth: 2,
                         segment: {
                             borderColor: function(context) {
+                                // Safety check: ensure we have both current and previous points
+                                if (!context || !context.p0 || !context.p0.parsed || context.p0.parsed.y === undefined) {
+                                    return '#d4a853';
+                                }
                                 const current = context.parsed.y;
                                 const previous = context.p0.parsed.y;
                                 if (current >= baseCapital && previous >= baseCapital) return '#22c55e';
