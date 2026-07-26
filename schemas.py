@@ -63,17 +63,15 @@ class TradeCreate(BaseModel):
     followed_plan: str
     mistakes: Optional[str] = None
     notes: Optional[str] = None
-    before_image: Optional[str] = None
-    after_image: Optional[str] = None
+    before_image: Optional[str] = None   # Base64 string
+    after_image: Optional[str] = None    # Base64 string
     confidence: Optional[int] = None
     session: Optional[str] = None
     account_id: Optional[int] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    # NEW FIELDS
     status: Optional[str] = "Closed"
     journal_entry: Optional[str] = None
-    # ✅ FIX: use created_at (datetime) instead of trade_date (date)
     created_at: Optional[datetime] = None
 
 class TradeResponse(TradeCreate):
@@ -103,10 +101,8 @@ class TradeUpdate(BaseModel):
     account_id: Optional[int] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    # NEW FIELDS
     status: Optional[str] = None
     journal_entry: Optional[str] = None
-    # ✅ FIX: use created_at (datetime) instead of trade_date (date)
     created_at: Optional[datetime] = None
 
 # ===== WATCHLIST =====

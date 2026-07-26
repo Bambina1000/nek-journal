@@ -22,24 +22,18 @@ import re
 from collections import Counter
 
 # ---------- CONFIG ----------
-UPLOAD_DIR = "static/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 SECRET_KEY = "your-super-secret-key-change-this-in-production"
 ALGORITHM = "HS256"
-
-# 🔥 INCREASED TOKEN EXPIRY – 7 days (10,080 minutes)
 ACCESS_TOKEN_EXPIRE_MINUTES = 10080   # 7 days
 
-# FIX: Use pbkdf2_sha256 instead of bcrypt to avoid 72-byte password limit
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Email config
+# Email config (optional)
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
-SMTP_USER = "your-email@gmail.com"  # Replace with your email
-SMTP_PASSWORD = "your-app-password"  # Generate Gmail App Password
+SMTP_USER = "your-email@gmail.com"
+SMTP_PASSWORD = "your-app-password"
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -54,6 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve static files (if any)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -61,10 +56,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 def verify_password(plain, hashed):
     return pwd_context.verify(plain, hashed)
 
-
 def get_password_hash(password):
     return pwd_context.hash(password)
-
 
 def authenticate_user(db: Session, username: str, password: str):
     user = db.query(models.User).filter(models.User.username == username).first()
@@ -72,13 +65,11 @@ def authenticate_user(db: Session, username: str, password: str):
         return False
     return user
 
-
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
@@ -114,7 +105,6 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return db_user
 
-
 @app.post("/token", response_model=schemas.Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -123,13 +113,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-
 @app.get("/users/me", response_model=schemas.UserResponse)
 async def get_current_user_info(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 
-# ---------- ACCOUNT ENDPOINTS (with auth) ----------
+# ---------- ACCOUNT ENDPOINTS ----------
 @app.post("/accounts/", response_model=schemas.AccountResponse)
 def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db),
                    current_user: models.User = Depends(get_current_user)):
@@ -139,11 +128,9 @@ def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db)
     db.refresh(db_account)
     return db_account
 
-
 @app.get("/accounts/", response_model=list[schemas.AccountResponse])
 def get_accounts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Account).filter(models.Account.user_id == current_user.id).all()
-
 
 @app.put("/accounts/{account_id}", response_model=schemas.AccountResponse)
 def update_account(account_id: int, account: schemas.AccountUpdate, db: Session = Depends(get_db),
@@ -158,7 +145,6 @@ def update_account(account_id: int, account: schemas.AccountUpdate, db: Session 
     db.refresh(db_account)
     return db_account
 
-
 @app.delete("/accounts/{account_id}")
 def delete_account(account_id: int, db: Session = Depends(get_db),
                    current_user: models.User = Depends(get_current_user)):
@@ -171,33 +157,7 @@ def delete_account(account_id: int, db: Session = Depends(get_db),
     return {"message": "Account deleted"}
 
 
-# ---------- HELPER: SAVE UPLOADED IMAGE ----------
-def save_uploaded_file(upload_file: UploadFile, prefix: str) -> str:
-    """Save an uploaded image and return the public URL."""
-    if not upload_file or not upload_file.filename:
-        return None
-
-    # Check file size (max 10 MB)
-    upload_file.file.seek(0, 2)
-    size = upload_file.file.tell()
-    upload_file.file.seek(0)
-    if size > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"{prefix} image too large (max 10 MB)")
-
-    ext = os.path.splitext(upload_file.filename)[1]
-    filename = f"{prefix}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, filename)
-
-    try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(upload_file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}")
-
-    return f"/static/uploads/{filename}"
-
-
-# ---------- TRADE ENDPOINTS (FULLY FIXED) ----------
+# ---------- TRADE ENDPOINTS (Base64 images) ----------
 @app.post("/trades/", response_model=schemas.TradeResponse)
 async def create_trade(
         pair: str = Form(...),
@@ -219,9 +179,9 @@ async def create_trade(
         take_profit: float = Form(None),
         status: str = Form("Closed"),
         journal_entry: str = Form(None),
-        created_at: str = Form(None),          # <-- FIXED: now receives created_at
-        before_image: UploadFile = File(None),
-        after_image: UploadFile = File(None),
+        created_at: str = Form(None),
+        before_image: str = Form(None),   # Base64 string
+        after_image: str = Form(None),    # Base64 string
         db: Session = Depends(get_db),
         current_user: models.User = Depends(get_current_user)
 ):
@@ -233,10 +193,6 @@ async def create_trade(
             parsed_dt = datetime.utcnow()
     else:
         parsed_dt = datetime.utcnow()
-
-    # Save images (if any)
-    before_path = save_uploaded_file(before_image, "before") if before_image else None
-    after_path = save_uploaded_file(after_image, "after") if after_image else None
 
     trade_data = {
         "pair": pair,
@@ -251,8 +207,8 @@ async def create_trade(
         "followed_plan": followed_plan,
         "mistakes": mistakes,
         "notes": notes,
-        "before_image": before_path,
-        "after_image": after_path,
+        "before_image": before_image,
+        "after_image": after_image,
         "confidence": confidence,
         "session": session,
         "account_id": account_id,
@@ -267,7 +223,6 @@ async def create_trade(
     db.add(db_trade)
     db.commit()
     db.refresh(db_trade)
-    # eager load account (so response includes account.name)
     db_trade = db.query(models.Trade).filter(models.Trade.id == db_trade.id).first()
     return db_trade
 
@@ -300,8 +255,8 @@ async def update_trade(
     status: str = Form("Closed"),
     journal_entry: str = Form(None),
     created_at: str = Form(None),
-    before_image: UploadFile = File(None),
-    after_image: UploadFile = File(None),
+    before_image: str = Form(None),
+    after_image: str = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -312,16 +267,11 @@ async def update_trade(
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
 
-    # Update images if new ones are provided
-    if before_image and before_image.filename:
-        new_path = save_uploaded_file(before_image, "before")
-        if new_path:
-            db_trade.before_image = new_path
-
-    if after_image and after_image.filename:
-        new_path = save_uploaded_file(after_image, "after")
-        if new_path:
-            db_trade.after_image = new_path
+    # Update images if new Base64 strings are provided
+    if before_image is not None:
+        db_trade.before_image = before_image
+    if after_image is not None:
+        db_trade.after_image = after_image
 
     # Update date if provided
     if created_at:
@@ -329,7 +279,7 @@ async def update_trade(
             parsed_dt = datetime.fromisoformat(created_at)
             db_trade.created_at = parsed_dt
         except ValueError:
-            pass  # keep existing if invalid
+            pass
 
     # Update all other fields
     update_fields = {
@@ -382,11 +332,9 @@ def add_watchlist(item: schemas.WatchlistItemCreate, db: Session = Depends(get_d
     db.refresh(db_item)
     return db_item
 
-
 @app.get("/watchlist/", response_model=list[schemas.WatchlistItemResponse])
 def get_watchlist(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.WatchlistItem).filter(models.WatchlistItem.user_id == current_user.id).all()
-
 
 @app.delete("/watchlist/{item_id}")
 def delete_watchlist(item_id: int, db: Session = Depends(get_db),
@@ -411,32 +359,25 @@ def backup_data(db: Session = Depends(get_db), current_user: models.User = Depen
         "accounts": [a.__dict__ for a in accounts],
         "watchlist": [w.__dict__ for w in watchlist]
     }
-    # Clean up SQLAlchemy internal keys
     for key in ["trades", "accounts", "watchlist"]:
         for item in data[key]:
             item.pop("_sa_instance_state", None)
             item.pop("user_id", None)
-            item.pop("id", None)  # Let DB auto-generate on restore
+            item.pop("id", None)
     return data
-
 
 @app.post("/restore/")
 def restore_data(data: dict, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    # Delete existing data for this user
     db.query(models.Trade).filter(models.Trade.user_id == current_user.id).delete()
     db.query(models.Account).filter(models.Account.user_id == current_user.id).delete()
     db.query(models.WatchlistItem).filter(models.WatchlistItem.user_id == current_user.id).delete()
     db.commit()
 
-    # Restore accounts
     for acc in data.get("accounts", []):
         acc["user_id"] = current_user.id
         db.add(models.Account(**acc))
     db.commit()
 
-    # Restore trades (need to map account_id correctly if restoring accounts with new IDs)
-    # For simplicity, we'll assume account names are unique per user and we match by name
-    # Better: we map old account names to new IDs
     account_map = {}
     for acc in data.get("accounts", []):
         old_name = acc["name"]
@@ -454,7 +395,6 @@ def restore_data(data: dict, db: Session = Depends(get_db), current_user: models
             t["account_id"] = None
         db.add(models.Trade(**t))
 
-    # Restore watchlist
     for w in data.get("watchlist", []):
         w.pop("id", None)
         w["user_id"] = current_user.id
@@ -464,7 +404,7 @@ def restore_data(data: dict, db: Session = Depends(get_db), current_user: models
     return {"message": "Data restored successfully"}
 
 
-# ---------- REPORT SETTINGS (Email Reports) ----------
+# ---------- REPORT SETTINGS ----------
 @app.post("/report-settings/", response_model=schemas.ReportSettingResponse)
 def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Depends(get_db),
                         current_user: models.User = Depends(get_current_user)):
@@ -472,7 +412,6 @@ def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Dep
     if existing:
         existing.email = settings.email
         existing.frequency = settings.frequency
-        # If you want to allow updating send_day, add it to schema and update here
     else:
         existing = models.ReportSetting(**settings.dict(), user_id=current_user.id)
         db.add(existing)
@@ -480,14 +419,12 @@ def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Dep
     db.refresh(existing)
     return existing
 
-
 @app.get("/report-settings/", response_model=schemas.ReportSettingResponse)
 def get_report_settings(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     settings = db.query(models.ReportSetting).filter(models.ReportSetting.user_id == current_user.id).first()
     if not settings:
         raise HTTPException(status_code=404, detail="No report settings found")
     return settings
-
 
 def send_email_report(user_email: str, content: str):
     msg = MIMEMultipart()
@@ -500,7 +437,6 @@ def send_email_report(user_email: str, content: str):
         server.login(SMTP_USER, SMTP_PASSWORD)
         server.sendmail(SMTP_USER, user_email, msg.as_string())
 
-
 def generate_report(trades):
     html = "<h1>Weekly Trading Summary</h1>"
     if not trades:
@@ -512,36 +448,26 @@ def generate_report(trades):
     win_rate = (wins / total) * 100 if total else 0
     html += f"<p>Total Trades: {total} | Wins: {wins} | Losses: {losses} | Win Rate: {win_rate:.1f}%</p>"
     html += f"<p>Net P&L: ${pnl:.2f}</p>"
-    # Add top symbols
     pairs = [t.pair for t in trades]
     top_pairs = Counter(pairs).most_common(3)
     html += "<p>Top Traded Pairs: " + ", ".join([f"{p[0]} ({p[1]})" for p in top_pairs]) + "</p>"
     return html
 
-
-# UPDATED: Scheduler checks for Saturday (weekday=5) and only sends once per day.
 def scheduled_email_job():
     from database import SessionLocal
     db = SessionLocal()
     try:
-        today_weekday = datetime.utcnow().weekday()  # Monday=0, Sunday=6
-        # Saturday = 5
+        today_weekday = datetime.utcnow().weekday()
         if today_weekday != 5:
-            return  # Only run on Saturdays
-
+            return
         users_with_reports = db.query(models.User).join(models.ReportSetting).all()
         for user in users_with_reports:
             settings = db.query(models.ReportSetting).filter(models.ReportSetting.user_id == user.id).first()
-            if not settings:
+            if not settings or settings.frequency != 'weekly':
                 continue
-            if settings.frequency != 'weekly':
-                continue
-
-            # Check if we already sent today (avoid multiple sends)
             today_str = datetime.utcnow().date().isoformat()
             if settings.last_sent and settings.last_sent.date().isoformat() == today_str:
                 continue
-
             trades = db.query(models.Trade).filter(
                 models.Trade.user_id == user.id,
                 models.Trade.created_at > datetime.utcnow() - timedelta(days=7)
@@ -557,18 +483,13 @@ def scheduled_email_job():
     finally:
         db.close()
 
-
-# ---------- MANUAL TEST ENDPOINT ----------
 @app.post("/send-test-report/")
 async def send_test_report(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Get the user's report settings
     settings = db.query(models.ReportSetting).filter(models.ReportSetting.user_id == current_user.id).first()
     if not settings:
         raise HTTPException(404, "No report settings found. Please set your email first.")
     if not settings.email:
         raise HTTPException(400, "No email address set in your report settings.")
-
-    # Generate the report (last 7 days)
     trades = db.query(models.Trade).filter(
         models.Trade.user_id == current_user.id,
         models.Trade.created_at > datetime.utcnow() - timedelta(days=7)
@@ -581,7 +502,7 @@ async def send_test_report(current_user: models.User = Depends(get_current_user)
         raise HTTPException(500, f"Failed to send: {str(e)}")
 
 
-# ---------- STATS (with auth) ----------
+# ---------- STATS ----------
 @app.get("/stats/")
 def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trades = db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
@@ -610,7 +531,7 @@ def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends
     }
 
 
-# ---------- CSV EXPORT (with auth) ----------
+# ---------- CSV EXPORT ----------
 @app.get("/export/csv")
 def export_csv(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trades = db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
@@ -642,7 +563,7 @@ async def read_root():
     return FileResponse("static/index.html")
 
 
-# ---------- SCHEDULER START ----------
+# ---------- SCHEDULER ----------
 scheduler = BackgroundScheduler()
 scheduler.add_job(scheduled_email_job, "interval", hours=24)
 scheduler.start()

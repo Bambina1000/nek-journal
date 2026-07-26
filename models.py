@@ -52,19 +52,16 @@ class Trade(Base):
     followed_plan = Column(String)
     mistakes = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)  # <-- will be overridden when frontend sends it
-    before_image = Column(String, nullable=True)
-    after_image = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)  # overridden when frontend sends it
+    before_image = Column(Text, nullable=True)   # store Base64 string
+    after_image = Column(Text, nullable=True)    # store Base64 string
     confidence = Column(Integer, nullable=True)
     session = Column(String, nullable=True)
     stop_loss = Column(Float, nullable=True)
     take_profit = Column(Float, nullable=True)
 
-    # NEW FIELDS
     status = Column(String, default="Closed")       # "Open" or "Closed"
     journal_entry = Column(Text, nullable=True)     # Long-form reflection
-
-    # Removed the extra 'trade_date' column – we use 'created_at' for the trade timestamp
 
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

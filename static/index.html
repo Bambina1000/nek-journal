@@ -1623,7 +1623,7 @@
         }
 
         // ============================================================
-        // TRADE SUBMIT (FormData for both POST and PUT)
+        // TRADE SUBMIT (FormData for both POST and PUT) – NOW WITH BASE64
         // ============================================================
         document.getElementById('tradeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1660,10 +1660,18 @@
             formData.append('journal_entry', document.getElementById('modal-journal').value || '');
             formData.append('created_at', createdAt);
 
+            // --- Convert images to Base64 and append as strings ---
             const beforeFile = document.getElementById('modal-before-image').files[0];
             const afterFile = document.getElementById('modal-after-image').files[0];
-            if (beforeFile) formData.append('before_image', beforeFile);
-            if (afterFile) formData.append('after_image', afterFile);
+
+            if (beforeFile) {
+                const base64 = await toBase64(beforeFile);
+                formData.append('before_image', base64);
+            }
+            if (afterFile) {
+                const base64 = await toBase64(afterFile);
+                formData.append('after_image', base64);
+            }
 
             let url = `${API_URL}/trades/`;
             let method = 'POST';
@@ -1690,6 +1698,18 @@
                 alert('Error: ' + err.message);
             }
         });
+
+        // ============================================================
+        // Helper: Convert File to Base64
+        // ============================================================
+        function toBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
 
         // ============================================================
         // CONFIDENCE SLIDER
