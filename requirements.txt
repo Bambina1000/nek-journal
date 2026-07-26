@@ -11,3 +11,4 @@ passlib[bcrypt]
 apscheduler
 httpx
 email-validator
+slowapi
