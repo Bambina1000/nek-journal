@@ -23,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Major+Mono+Display&display=swap" rel="stylesheet" />
     <style>
-        /* ===== BASE THEME (same as before) ===== */
+        /* ===== BASE THEME (unchanged) ===== */
         :root { --gold: #d4a853; --gold-light: #f5d68a; --gold-dark: #b8923a; --gold-glow: rgba(212,168,83,0.25); --bg-card: #141414; }
         .dark { --bg-body: #0a0a0a; --bg-card: #141414; --text-primary: #f5f5f5; --text-secondary: rgba(245,245,245,0.7); --border-color: rgba(212,168,83,0.15); }
         .light { --bg-body: #f5f7fa; --bg-card: #ffffff; --text-primary: #1a1a1a; --text-secondary: rgba(26,26,26,0.7); --border-color: rgba(212,168,83,0.25); }
@@ -1220,6 +1220,20 @@
         }
 
         // ============================================================
+        // HELPER: Fetch a single trade by ID (FRESH from server)
+        // ============================================================
+        async function fetchTradeById(id) {
+            try {
+                const res = await apiFetch(`${API_URL}/trades/${id}`);
+                if (!res.ok) throw new Error('Failed to fetch trade');
+                return await res.json();
+            } catch (err) {
+                console.error('Error fetching trade:', err);
+                return null;
+            }
+        }
+
+        // ============================================================
         // CONFIG & AUTH
         // ============================================================
         const API_URL = "";
@@ -1660,11 +1674,16 @@
         }
 
         // ============================================================
-        // TRADE DETAIL VIEW (with lightbox)
+        // TRADE DETAIL VIEW (with lightbox) – FIXED: fetches fresh data
         // ============================================================
-        function openTradeDetail(id) {
-            const trade = allTradesCache.find(t => t.id === id);
-            if (!trade) return;
+        async function openTradeDetail(id) {
+            // Fetch fresh data from the server
+            const trade = await fetchTradeById(id);
+            if (!trade) {
+                alert('Trade not found');
+                return;
+            }
+
             const modal = document.getElementById('tradeDetailModal');
             const content = document.getElementById('detail-content');
             const title = document.getElementById('detail-trade-title');
