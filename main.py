@@ -129,7 +129,7 @@ async def get_current_user_info(current_user: models.User = Depends(get_current_
     return current_user
 
 
-# ---------- ACCOUNT ENDPOINTS ----------
+# ---------- ACCOUNT ENDPOINTS (with auth) ----------
 @app.post("/accounts/", response_model=schemas.AccountResponse)
 def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db),
                    current_user: models.User = Depends(get_current_user)):
@@ -171,7 +171,33 @@ def delete_account(account_id: int, db: Session = Depends(get_db),
     return {"message": "Account deleted"}
 
 
-# ---------- TRADE ENDPOINTS (FIXED) ----------
+# ---------- HELPER: SAVE UPLOADED IMAGE ----------
+def save_uploaded_file(upload_file: UploadFile, prefix: str) -> str:
+    """Save an uploaded image and return the public URL."""
+    if not upload_file or not upload_file.filename:
+        return None
+
+    # Check file size (max 10 MB)
+    upload_file.file.seek(0, 2)
+    size = upload_file.file.tell()
+    upload_file.file.seek(0)
+    if size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"{prefix} image too large (max 10 MB)")
+
+    ext = os.path.splitext(upload_file.filename)[1]
+    filename = f"{prefix}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(upload_file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}")
+
+    return f"/static/uploads/{filename}"
+
+
+# ---------- TRADE ENDPOINTS (FULLY FIXED) ----------
 @app.post("/trades/", response_model=schemas.TradeResponse)
 async def create_trade(
         pair: str = Form(...),
@@ -193,36 +219,24 @@ async def create_trade(
         take_profit: float = Form(None),
         status: str = Form("Closed"),
         journal_entry: str = Form(None),
-        created_at: str = Form(None),          # <-- changed from trade_date
+        created_at: str = Form(None),          # <-- FIXED: now receives created_at
         before_image: UploadFile = File(None),
         after_image: UploadFile = File(None),
         db: Session = Depends(get_db),
         current_user: models.User = Depends(get_current_user)
 ):
-    before_path = after_path = None
-    if before_image and before_image.filename:
-        ext = os.path.splitext(before_image.filename)[1]
-        filename = f"before_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(before_image.file, buffer)
-        before_path = f"/static/uploads/{filename}"
-    if after_image and after_image.filename:
-        ext = os.path.splitext(after_image.filename)[1]
-        filename = f"after_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(after_image.file, buffer)
-        after_path = f"/static/uploads/{filename}"
-
-    # --- parse created_at ---
+    # Parse created_at
     if created_at:
         try:
-            parsed_dt = datetime.fromisoformat(created_at)  # e.g. "2026-07-23T14:30:00"
+            parsed_dt = datetime.fromisoformat(created_at)
         except ValueError:
             parsed_dt = datetime.utcnow()
     else:
         parsed_dt = datetime.utcnow()
+
+    # Save images (if any)
+    before_path = save_uploaded_file(before_image, "before") if before_image else None
+    after_path = save_uploaded_file(after_image, "after") if after_image else None
 
     trade_data = {
         "pair": pair,
@@ -246,7 +260,7 @@ async def create_trade(
         "take_profit": take_profit,
         "status": status,
         "journal_entry": journal_entry,
-        "created_at": parsed_dt,              # <-- store parsed datetime
+        "created_at": parsed_dt,
         "user_id": current_user.id,
     }
     db_trade = models.Trade(**trade_data)
@@ -264,25 +278,82 @@ def get_trades(db: Session = Depends(get_db), current_user: models.User = Depend
 
 
 @app.put("/trades/{trade_id}", response_model=schemas.TradeResponse)
-def update_trade(trade_id: int, trade: schemas.TradeUpdate, db: Session = Depends(get_db),
-                 current_user: models.User = Depends(get_current_user)):
-    db_trade = db.query(models.Trade).filter(models.Trade.id == trade_id,
-                                             models.Trade.user_id == current_user.id).first()
+async def update_trade(
+    trade_id: int,
+    pair: str = Form(...),
+    direction: str = Form(...),
+    setup_type: str = Form(...),
+    position_size: float = Form(...),
+    entry_price: float = Form(...),
+    exit_price: float = Form(...),
+    risk_reward: float = Form(...),
+    pnl: float = Form(...),
+    emotion_before: str = Form(...),
+    followed_plan: str = Form(...),
+    mistakes: str = Form(None),
+    notes: str = Form(None),
+    confidence: int = Form(None),
+    session: str = Form(None),
+    account_id: int = Form(None),
+    stop_loss: float = Form(None),
+    take_profit: float = Form(None),
+    status: str = Form("Closed"),
+    journal_entry: str = Form(None),
+    created_at: str = Form(None),
+    before_image: UploadFile = File(None),
+    after_image: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    db_trade = db.query(models.Trade).filter(
+        models.Trade.id == trade_id,
+        models.Trade.user_id == current_user.id
+    ).first()
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
 
-    update_data = trade.dict(exclude_unset=True)
+    # Update images if new ones are provided
+    if before_image and before_image.filename:
+        new_path = save_uploaded_file(before_image, "before")
+        if new_path:
+            db_trade.before_image = new_path
 
-    # --- if created_at is provided as a string, parse it ---
-    if 'created_at' in update_data and update_data['created_at'] is not None:
-        if isinstance(update_data['created_at'], str):
-            try:
-                update_data['created_at'] = datetime.fromisoformat(update_data['created_at'])
-            except ValueError:
-                # if invalid, we remove the key so we don't overwrite with None
-                del update_data['created_at']
+    if after_image and after_image.filename:
+        new_path = save_uploaded_file(after_image, "after")
+        if new_path:
+            db_trade.after_image = new_path
 
-    for key, value in update_data.items():
+    # Update date if provided
+    if created_at:
+        try:
+            parsed_dt = datetime.fromisoformat(created_at)
+            db_trade.created_at = parsed_dt
+        except ValueError:
+            pass  # keep existing if invalid
+
+    # Update all other fields
+    update_fields = {
+        "pair": pair,
+        "direction": direction,
+        "setup_type": setup_type,
+        "position_size": position_size,
+        "entry_price": entry_price,
+        "exit_price": exit_price,
+        "risk_reward": risk_reward,
+        "pnl": pnl,
+        "emotion_before": emotion_before,
+        "followed_plan": followed_plan,
+        "mistakes": mistakes,
+        "notes": notes,
+        "confidence": confidence,
+        "session": session,
+        "account_id": account_id,
+        "stop_loss": stop_loss,
+        "take_profit": take_profit,
+        "status": status,
+        "journal_entry": journal_entry,
+    }
+    for key, value in update_fields.items():
         setattr(db_trade, key, value)
 
     db.commit()
@@ -393,7 +464,7 @@ def restore_data(data: dict, db: Session = Depends(get_db), current_user: models
     return {"message": "Data restored successfully"}
 
 
-# ---------- REPORT SETTINGS ----------
+# ---------- REPORT SETTINGS (Email Reports) ----------
 @app.post("/report-settings/", response_model=schemas.ReportSettingResponse)
 def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Depends(get_db),
                         current_user: models.User = Depends(get_current_user)):
@@ -401,6 +472,7 @@ def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Dep
     if existing:
         existing.email = settings.email
         existing.frequency = settings.frequency
+        # If you want to allow updating send_day, add it to schema and update here
     else:
         existing = models.ReportSetting(**settings.dict(), user_id=current_user.id)
         db.add(existing)
@@ -486,6 +558,7 @@ def scheduled_email_job():
         db.close()
 
 
+# ---------- MANUAL TEST ENDPOINT ----------
 @app.post("/send-test-report/")
 async def send_test_report(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Get the user's report settings
@@ -508,7 +581,7 @@ async def send_test_report(current_user: models.User = Depends(get_current_user)
         raise HTTPException(500, f"Failed to send: {str(e)}")
 
 
-# ---------- STATS ----------
+# ---------- STATS (with auth) ----------
 @app.get("/stats/")
 def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trades = db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
@@ -537,7 +610,7 @@ def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends
     }
 
 
-# ---------- CSV EXPORT ----------
+# ---------- CSV EXPORT (with auth) ----------
 @app.get("/export/csv")
 def export_csv(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trades = db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()

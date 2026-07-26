@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nek-journal-v1';
+const CACHE_NAME = 'nek-journal-v2';  // or v3, v4 – just increment it
 const urlsToCache = [
     '/',
     '/static/index.html',

@@ -1266,7 +1266,7 @@
         }
 
         // ============================================================
-        // EDIT (fixed: properly populate all fields)
+        // EDIT (fixed: properly populate all fields AND show images)
         // ============================================================
         function editTrade(id) {
             const trade = allTradesCache.find(t => t.id === id);
@@ -1302,15 +1302,33 @@
             if (trade.confidence) setConfidence(trade.confidence);
             else resetConfidence();
 
-            // Clear image previews and file inputs
-            document.getElementById('before-preview').src = '';
-            document.getElementById('before-preview').classList.add('hidden');
-            document.getElementById('before-placeholder').classList.remove('hidden');
-            document.getElementById('after-preview').src = '';
-            document.getElementById('after-preview').classList.add('hidden');
-            document.getElementById('after-placeholder').classList.remove('hidden');
+            // ------------------ FIX: Show existing images ------------------
+            // Before image
+            if (trade.before_image) {
+                document.getElementById('before-preview').src = trade.before_image;
+                document.getElementById('before-preview').classList.remove('hidden');
+                document.getElementById('before-placeholder').classList.add('hidden');
+            } else {
+                document.getElementById('before-preview').src = '';
+                document.getElementById('before-preview').classList.add('hidden');
+                document.getElementById('before-placeholder').classList.remove('hidden');
+            }
+
+            // After image
+            if (trade.after_image) {
+                document.getElementById('after-preview').src = trade.after_image;
+                document.getElementById('after-preview').classList.remove('hidden');
+                document.getElementById('after-placeholder').classList.add('hidden');
+            } else {
+                document.getElementById('after-preview').src = '';
+                document.getElementById('after-preview').classList.add('hidden');
+                document.getElementById('after-placeholder').classList.remove('hidden');
+            }
+
+            // Clear file inputs so user can upload new ones if desired
             document.getElementById('modal-before-image').value = '';
             document.getElementById('modal-after-image').value = '';
+            // --------------------------------------------------------------
 
             document.getElementById('tradeModal').classList.add('show');
         }
@@ -1330,7 +1348,7 @@
         }
 
         // ============================================================
-        // FIX: TRADE SUBMIT – NOW INCLUDES DATE & TIME
+        // FIX: TRADE SUBMIT – NOW ALWAYS USES FormData (for both POST and PUT)
         // ============================================================
         document.getElementById('tradeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1341,13 +1359,12 @@
             const timeVal = document.getElementById('modal-time').value;
             let createdAt = null;
             if (dateVal && timeVal) {
-                // Combine into ISO-like string: YYYY-MM-DDTHH:MM:SS
                 createdAt = `${dateVal}T${timeVal}:00`;
             } else {
-                // fallback to current time if missing
                 createdAt = new Date().toISOString();
             }
 
+            // --- Build FormData (same for both POST and PUT) ---
             const formData = new FormData();
             formData.append('pair', document.getElementById('modal-pair').value);
             formData.append('direction', document.getElementById('modal-direction').value);
@@ -1368,57 +1385,34 @@
             formData.append('take_profit', document.getElementById('modal-tp').value || '');
             formData.append('status', document.getElementById('modal-status').value);
             formData.append('journal_entry', document.getElementById('modal-journal').value || '');
-            // ADD THE CREATED_AT FIELD
             formData.append('created_at', createdAt);
 
+            // Add image files if selected
             const beforeFile = document.getElementById('modal-before-image').files[0];
             const afterFile = document.getElementById('modal-after-image').files[0];
             if (beforeFile) formData.append('before_image', beforeFile);
             if (afterFile) formData.append('after_image', afterFile);
 
+            // --- Determine URL and method ---
+            let url = `${API_URL}/trades/`;
+            let method = 'POST';
+            if (editId) {
+                url = `${API_URL}/trades/${editId}`;
+                method = 'PUT';
+            }
+
             try {
-                let url = `${API_URL}/trades/`;
-                let method = 'POST';
-                if (editId) {
-                    // For PUT, we send JSON, so include created_at there too.
-                    url = `${API_URL}/trades/${editId}`;
-                    method = 'PUT';
-                    const payload = {
-                        pair: formData.get('pair'),
-                        direction: formData.get('direction'),
-                        setup_type: formData.get('setup_type'),
-                        position_size: parseFloat(formData.get('position_size')),
-                        entry_price: parseFloat(formData.get('entry_price')),
-                        exit_price: parseFloat(formData.get('exit_price')),
-                        risk_reward: parseFloat(formData.get('risk_reward')),
-                        pnl: parseFloat(formData.get('pnl')),
-                        emotion_before: formData.get('emotion_before'),
-                        followed_plan: formData.get('followed_plan'),
-                        mistakes: formData.get('mistakes'),
-                        notes: formData.get('notes'),
-                        confidence: parseInt(formData.get('confidence')) || null,
-                        session: formData.get('session') || null,
-                        account_id: parseInt(formData.get('account_id')) || null,
-                        stop_loss: parseFloat(formData.get('stop_loss')) || null,
-                        take_profit: parseFloat(formData.get('take_profit')) || null,
-                        status: formData.get('status'),
-                        journal_entry: formData.get('journal_entry') || null,
-                        created_at: formData.get('created_at') // <-- FIX: include date/time
-                    };
-                    const res = await fetch(url, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!res.ok) throw new Error('Update failed');
-                } else {
-                    // POST using FormData (already contains created_at)
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        body: formData,
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (!res.ok) throw new Error('Create failed');
+                const res = await fetch(url, {
+                    method: method,
+                    body: formData,
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                        // No Content-Type header – browser sets it to multipart/form-data
+                    }
+                });
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`Request failed (${res.status}): ${errText}`);
                 }
                 document.getElementById('tradeModal').classList.remove('show');
                 document.getElementById('editTradeId').value = '';
