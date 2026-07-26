@@ -92,7 +92,8 @@
             box-shadow: 0 0 25px rgba(239,68,68,0.3);
         }
         /* === END CALENDAR === */
-        .trade-row:hover { background-color: rgba(212,168,83,0.05); transform: scale(1.01); transition: all 0.2s; }
+        .trade-row { cursor: pointer; transition: all 0.2s; }
+        .trade-row:hover { background-color: rgba(212,168,83,0.08); transform: scale(1.01); }
         .sidebar { position:fixed; left:0; top:0; bottom:0; width:220px; background-color:var(--bg-card); border-right:1px solid var(--border-color); display:flex; flex-direction:column; transition:transform 0.3s ease; overflow-y:auto; z-index:40; transform:translateX(-100%); }
         @media (min-width: 1024px) { .sidebar { transform:translateX(0); width:64px; } .sidebar:hover { width:200px; } .sidebar .hidden-text { display:none; } .sidebar:hover .hidden-text { display:inline; } }
         .sidebar.open { transform:translateX(0); }
@@ -237,6 +238,16 @@
         /* Metric number colors */
         .metric-positive { color: #22c55e; }
         .metric-negative { color: #ef4444; }
+
+        /* Trade Detail Modal Styles */
+        .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem; }
+        .detail-item { background:var(--bg-body); padding:0.5rem; border-radius:0.5rem; border:1px solid var(--border-color); }
+        .detail-item .label { font-size:0.6rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; }
+        .detail-item .value { font-family:'Major Mono Display',monospace; font-weight:700; font-size:0.85rem; color:var(--text-primary); }
+        .detail-section { margin-bottom:1.5rem; }
+        .detail-section h4 { font-size:0.75rem; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid var(--border-color); padding-bottom:0.3rem; margin-bottom:0.5rem; }
+        .detail-image { max-width:100%; border-radius:0.5rem; border:1px solid var(--border-color); margin-top:0.25rem; }
+        .detail-notes { white-space:pre-wrap; font-size:0.85rem; color:var(--text-secondary); }
     </style>
 </head>
 <body>
@@ -508,7 +519,17 @@
     <!-- ===== ADD TRADE BUTTON ===== -->
     <button id="addTradeBtn">+ ADD</button>
 
-    <!-- ===== TRADE MODAL (updated with Status & Journal) ===== -->
+    <!-- ===== TRADE DETAIL MODAL ===== -->
+    <div id="tradeDetailModal" class="modal-backdrop">
+        <div class="modal-content slide-in" style="max-width:700px;">
+            <button class="close" onclick="closeTradeDetail()">&times;</button>
+            <h2 id="detail-trade-title" style="margin-bottom:0.25rem;">Trade Details</h2>
+            <div id="detail-trade-subtitle" style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem;"></div>
+            <div id="detail-content"></div>
+        </div>
+    </div>
+
+    <!-- ===== TRADE MODAL (unchanged) ===== -->
     <div id="tradeModal" class="modal-backdrop">
         <div class="modal-content slide-in">
             <button class="close" id="closeModalBtn">&times;</button>
@@ -560,7 +581,7 @@
                     </div>
                 </div>
 
-                <!-- NEW: Trade Status & Confidence -->
+                <!-- Trade Status & Confidence -->
                 <div class="form-row">
                     <div class="form-group">
                         <label>Trade Status</label>
@@ -581,7 +602,7 @@
                     </div>
                 </div>
 
-                <!-- NEW: Journal Entry -->
+                <!-- Journal Entry -->
                 <div class="form-group">
                     <label>Journal Entry (Reflection)</label>
                     <textarea id="modal-journal" rows="4" placeholder="Write your full reflection here..."></textarea>
@@ -843,7 +864,7 @@
                 if (!res.ok) throw new Error('Failed to fetch accounts');
                 allAccountsCache = await res.json();
                 populateAccountSelects();
-                renderAccountList();
+                renderAccountList(); // update manage accounts modal if open
             } catch (err) {
                 console.error('Account fetch error:', err);
                 if (err.message.includes('401')) logout();
@@ -927,8 +948,8 @@
             try {
                 const res = await apiFetch(`${API_URL}/accounts/${accountId}`, { method: 'DELETE' });
                 if (!res.ok) throw new Error('Delete failed');
-                await fetchAllData();
-                renderAccountList();
+                await fetchAllData(); // refresh everything
+                renderAccountList(); // update modal
             } catch (err) {
                 alert('Delete failed: ' + err.message);
             }
@@ -1112,7 +1133,7 @@
         }
 
         // ============================================================
-        // RENDER TABLE
+        // RENDER TABLE (with green/red P&L, direction badges, and hover)
         // ============================================================
         function renderTable(trades) {
             const tbody = document.getElementById('tradesTableBody');
@@ -1128,6 +1149,7 @@
                 const accountName = t.account ? t.account.name : (t.account_id ? 'Deleted' : '');
                 const tr = document.createElement('tr');
                 tr.className = 'trade-row';
+                tr.setAttribute('onclick', `openTradeDetail(${t.id})`);
                 tr.innerHTML = `
                     <td><strong>${t.pair}</strong></td>
                     <td><span class="badge ${t.direction === 'BUY' ? 'badge-buy' : 'badge-sell'}">${t.direction}</span></td>
@@ -1140,7 +1162,7 @@
                     <td><span class="badge badge-session">${t.session || '-'}</span></td>
                     <td><span class="badge" style="background:${t.status === 'Open' ? 'rgba(34,197,94,0.2)' : 'var(--bg-body)'};color:${t.status === 'Open' ? '#22c55e' : 'var(--text-secondary)'};">${t.status || 'Closed'}</span></td>
                     <td style="text-align:center;">
-                        <div class="action-btns">
+                        <div class="action-btns" onclick="event.stopPropagation();">
                             <button class="edit-btn" onclick="editTrade(${t.id})" title="Edit">✏️</button>
                             <button class="delete-btn" onclick="deleteTrade(${t.id})" title="Delete">🗑️</button>
                         </div>
@@ -1151,7 +1173,100 @@
         }
 
         // ============================================================
-        // EDIT (populate all fields including date)
+        // TRADE DETAIL VIEW
+        // ============================================================
+        function openTradeDetail(id) {
+            const trade = allTradesCache.find(t => t.id === id);
+            if (!trade) return;
+            const modal = document.getElementById('tradeDetailModal');
+            const content = document.getElementById('detail-content');
+            const title = document.getElementById('detail-trade-title');
+            const subtitle = document.getElementById('detail-trade-subtitle');
+
+            title.textContent = `${trade.pair} – ${trade.direction}`;
+            const pnlColor = trade.pnl >= 0 ? '#22c55e' : '#ef4444';
+            subtitle.innerHTML = `
+                <span style="color:var(--text-secondary);">${trade.setup_type || 'Manual'} · ${trade.session || '—'}</span>
+                <span style="float:right;font-weight:700;color:${pnlColor};font-family:'Major Mono Display',monospace;">
+                    ${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(2)}
+                </span>
+            `;
+
+            // Build detail HTML
+            let html = `
+                <div class="detail-section">
+                    <h4>📊 Trade Summary</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item"><div class="label">Direction</div><div class="value">${trade.direction}</div></div>
+                        <div class="detail-item"><div class="label">Position Size</div><div class="value">${trade.position_size}</div></div>
+                        <div class="detail-item"><div class="label">Entry Price</div><div class="value">${trade.entry_price}</div></div>
+                        <div class="detail-item"><div class="label">Exit Price</div><div class="value">${trade.exit_price}</div></div>
+                        <div class="detail-item"><div class="label">Stop Loss</div><div class="value">${trade.stop_loss || '—'}</div></div>
+                        <div class="detail-item"><div class="label">Take Profit</div><div class="value">${trade.take_profit || '—'}</div></div>
+                        <div class="detail-item"><div class="label">Risk/Reward</div><div class="value">${trade.risk_reward}R</div></div>
+                        <div class="detail-item"><div class="label">Confidence</div><div class="value">${trade.confidence || '—'}/10</div></div>
+                        <div class="detail-item"><div class="label">Session</div><div class="value">${trade.session || '—'}</div></div>
+                        <div class="detail-item"><div class="label">Status</div><div class="value" style="color:${trade.status === 'Open' ? '#22c55e' : 'var(--text-secondary)'};">${trade.status || 'Closed'}</div></div>
+                        <div class="detail-item"><div class="label">Account</div><div class="value">${trade.account ? trade.account.name : '—'}</div></div>
+                        <div class="detail-item"><div class="label">Date</div><div class="value">${trade.created_at ? new Date(trade.created_at).toLocaleString() : '—'}</div></div>
+                    </div>
+                </div>
+            `;
+
+            // Mindset & Psychology
+            html += `
+                <div class="detail-section">
+                    <h4>🧠 Psychology</h4>
+                    <div class="detail-grid">
+                        <div class="detail-item"><div class="label">Mindset</div><div class="value">${trade.emotion_before || '—'}</div></div>
+                        <div class="detail-item"><div class="label">Followed Plan?</div><div class="value">${trade.followed_plan || '—'}</div></div>
+                        <div class="detail-item"><div class="label">Mistakes</div><div class="value">${trade.mistakes || 'None'}</div></div>
+                    </div>
+                </div>
+            `;
+
+            // Journal Entry
+            if (trade.journal_entry) {
+                html += `
+                    <div class="detail-section">
+                        <h4>📝 Journal Entry</h4>
+                        <div class="detail-notes">${trade.journal_entry.replace(/\n/g, '<br>')}</div>
+                    </div>
+                `;
+            }
+
+            // Notes
+            if (trade.notes) {
+                html += `
+                    <div class="detail-section">
+                        <h4>📌 Notes</h4>
+                        <div class="detail-notes">${trade.notes.replace(/\n/g, '<br>')}</div>
+                    </div>
+                `;
+            }
+
+            // Screenshots
+            if (trade.before_image || trade.after_image) {
+                html += `<div class="detail-section"><h4>📸 Screenshots</h4><div style="display:flex;gap:0.5rem;flex-wrap:wrap;">`;
+                if (trade.before_image) {
+                    html += `<div><div style="font-size:0.65rem;color:var(--text-secondary);">Before</div><img src="${trade.before_image}" class="detail-image" style="max-height:150px;" onclick="window.open('${trade.before_image}','_blank')" /></div>`;
+                }
+                if (trade.after_image) {
+                    html += `<div><div style="font-size:0.65rem;color:var(--text-secondary);">After</div><img src="${trade.after_image}" class="detail-image" style="max-height:150px;" onclick="window.open('${trade.after_image}','_blank')" /></div>`;
+                }
+                html += `</div></div>`;
+            }
+
+            content.innerHTML = html;
+            modal.classList.add('show');
+        }
+
+        function closeTradeDetail() {
+            document.getElementById('tradeDetailModal').classList.remove('show');
+        }
+
+        // ============================================================
+        // EDIT (fixed: properly populate all fields)
         // ============================================================
         function editTrade(id) {
             const trade = allTradesCache.find(t => t.id === id);
@@ -1177,9 +1292,7 @@
             document.getElementById('modal-tags').value = '';
             document.getElementById('modal-account').value = trade.account_id || '';
             document.getElementById('modal-session').value = trade.session || '';
-            // ✅ FIX: Use trade_date if available, fallback to created_at
-            const dateVal = trade.trade_date || trade.created_at || '';
-            document.getElementById('modal-date').value = dateVal ? dateVal.split('T')[0] : '';
+            document.getElementById('modal-date').value = trade.created_at ? trade.created_at.split('T')[0] : '';
             document.getElementById('modal-time').value = trade.created_at ? trade.created_at.split('T')[1].slice(0,5) : '';
             document.getElementById('modal-stop').value = trade.stop_loss || '';
             document.getElementById('modal-tp').value = trade.take_profit || '';
@@ -1237,9 +1350,6 @@
             formData.append('account_id', document.getElementById('modal-account').value || '');
             formData.append('stop_loss', document.getElementById('modal-stop').value || '');
             formData.append('take_profit', document.getElementById('modal-tp').value || '');
-            // ✅ FIX: Send the date from the input
-            const selectedDate = document.getElementById('modal-date').value;
-            formData.append('trade_date', selectedDate || '');
             formData.append('status', document.getElementById('modal-status').value);
             formData.append('journal_entry', document.getElementById('modal-journal').value || '');
 
@@ -1272,7 +1382,6 @@
                         account_id: parseInt(formData.get('account_id')) || null,
                         stop_loss: parseFloat(formData.get('stop_loss')) || null,
                         take_profit: parseFloat(formData.get('take_profit')) || null,
-                        trade_date: formData.get('trade_date') || null, // ✅ FIX: include trade_date
                         status: formData.get('status'),
                         journal_entry: formData.get('journal_entry') || null
                     };
@@ -1354,7 +1463,7 @@
         }
 
         // ============================================================
-        // METRICS
+        // METRICS (updated with green/red for P&L and Expectancy)
         // ============================================================
         function updateAccountMetrics(trades, baseCapital) {
             let totalPnl = trades.reduce((acc, t) => acc + t.pnl, 0);
@@ -1456,124 +1565,69 @@
         }
 
         // ============================================================
-        // RENDER EQUITY CURVE – FIXED: chronological order, curvy line, safe segment coloring
+        // RENDER EQUITY CURVE – WITH GRADIENT FILL (red->green) & GOLDEN LINE
         // ============================================================
         function renderEquityCurve(trades, baseCapital) {
-    const ctx = document.getElementById('equityCurveChart').getContext('2d');
+            const ctx = document.getElementById('equityCurveChart').getContext('2d');
+            let running = baseCapital, labels = ['Start'], data = [baseCapital];
+            trades.forEach((t,i) => { running += t.pnl; labels.push(`Trade #${i+1}`); data.push(running); });
+            if (trades.length === 0) { labels = ['Start', 'Current']; data = [baseCapital, baseCapital]; }
 
-    // 1. Sort trades by date (oldest first)
-    const sortedTrades = [...trades].sort((a, b) => {
-        const dateA = a.trade_date || a.created_at;
-        const dateB = b.trade_date || b.created_at;
-        return new Date(dateA) - new Date(dateB);
-    });
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(212,168,83,0.1)' : 'rgba(0,0,0,0.1)';
+            const textColor = isDark ? '#d4a853' : '#4a3a1a';
 
-    let running = baseCapital;
-    let labels = ['Start'];
-    let data = [baseCapital];
+            const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+            gradient.addColorStop(0, '#22c55e');
+            gradient.addColorStop(0.5, '#d4a853');
+            gradient.addColorStop(1, '#ef4444');
 
-    // 2. Build equity curve in chronological order
-    sortedTrades.forEach((t, i) => {
-        running += t.pnl;
-        labels.push(`Trade #${i+1}`);
-        data.push(running);
-    });
+            if (equityChartInstance) equityChartInstance.destroy();
 
-    // Ensure at least 2 data points so the chart can draw a line
-    if (data.length < 2) {
-        labels = ['Start', 'Current'];
-        data = [baseCapital, baseCapital];
-    }
-
-    const isDark = document.documentElement.classList.contains('dark');
-    const gridColor = isDark ? 'rgba(212,168,83,0.1)' : 'rgba(0,0,0,0.1)';
-    const textColor = isDark ? '#d4a853' : '#4a3a1a';
-
-    if (equityChartInstance) equityChartInstance.destroy();
-
-    // Create a gradient fill that goes from red (bottom) to green (top)
-    const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
-    gradient.addColorStop(0, '#22c55e');   // green at top
-    gradient.addColorStop(0.5, '#d4a853'); // gold in middle
-    gradient.addColorStop(1, '#ef4444');   // red at bottom
-
-    equityChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Equity ($)',
-                data: data,
-                borderColor: '#d4a853',      // gold line always
-                backgroundColor: gradient,    // gradient fill
-                borderWidth: 3,
-                fill: true,
-                tension: 0.4,                // smooth curve
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                pointBackgroundColor: data.map(v => v >= baseCapital ? '#22c55e' : '#ef4444'),
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const value = context.parsed.y;
-                            const diff = value - baseCapital;
-                            const sign = diff >= 0 ? '+' : '';
-                            return `$${value.toFixed(2)} (${sign}$${diff.toFixed(2)})`;
+            equityChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Equity ($)',
+                        data: data,
+                        borderColor: '#d4a853',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#d4a853',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `$${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 8 } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 8 } }
                         }
                     }
                 }
-            },
-            scales: {
-                x: {
-                    grid: { color: gridColor },
-                    ticks: { color: textColor, font: { size: 8 } }
-                },
-                y: {
-                    grid: { color: gridColor },
-                    ticks: { color: textColor, font: { size: 8 } }
-                }
-            }
-        },
-        plugins: [{
-            id: 'baseline',
-            afterDraw: function(chart) {
-                const yScale = chart.scales.y;
-                const xScale = chart.scales.x;
-                const yPos = yScale.getPixelForValue(baseCapital);
-                const ctx = chart.ctx;
-                // Dashed baseline
-                ctx.save();
-                ctx.beginPath();
-                ctx.setLineDash([5, 5]);
-                ctx.strokeStyle = '#d4a853';
-                ctx.lineWidth = 1.5;
-                ctx.globalAlpha = 0.5;
-                ctx.moveTo(xScale.left, yPos);
-                ctx.lineTo(xScale.right, yPos);
-                ctx.stroke();
-                ctx.restore();
-                // Label
-                ctx.save();
-                ctx.fillStyle = '#d4a853';
-                ctx.globalAlpha = 0.7;
-                ctx.font = '8px "Major Mono Display", monospace';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText(`Start $${baseCapital.toFixed(0)}`, xScale.left + 4, yPos - 4);
-                ctx.restore();
-            }
-        }]
-    });
-}
+            });
+        }
 
         // ============================================================
         // CALENDAR
@@ -1588,8 +1642,7 @@
             document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
             let dailyPnl = {};
             trades.forEach((t, idx) => {
-                let key = t.trade_date || t.created_at || `${year}-${String(month+1).padStart(2,'0')}-${String((idx%28)+1).padStart(2,'0')}`;
-                if (key) key = key.split('T')[0];
+                let key = t.created_at ? t.created_at.split('T')[0] : `${year}-${String(month+1).padStart(2,'0')}-${String((idx%28)+1).padStart(2,'0')}`;
                 if (!dailyPnl[key]) dailyPnl[key] = 0;
                 dailyPnl[key] += t.pnl;
             });
@@ -1625,7 +1678,6 @@
             document.getElementById('submitTradeBtn').textContent = 'Log Trade';
             document.getElementById('editTradeId').value = '';
 
-            // Reset ALL form fields to empty/default
             document.getElementById('modal-pair').value = '';
             document.getElementById('modal-direction').value = 'BUY';
             document.getElementById('modal-position_size').value = '';
@@ -1651,7 +1703,6 @@
             resetConfidence();
             resetPreview('before');
             resetPreview('after');
-
             document.getElementById('modal-before-image').value = '';
             document.getElementById('modal-after-image').value = '';
         }
@@ -1712,7 +1763,7 @@
         }
 
         // ============================================================
-        // ANALYTICS CHARTS
+        // ANALYTICS CHARTS (colors updated for positive/negative)
         // ============================================================
         function renderAnalytics(trades) {
             if (!document.getElementById('view-analytics').classList.contains('active')) return;
@@ -1924,7 +1975,7 @@
         }
 
         // ============================================================
-        // SIDEBAR TOGGLE
+        // SIDEBAR TOGGLE (FIXED FOR MOBILE)
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
