@@ -251,9 +251,23 @@ async def create_trade(
     db_trade = db.query(models.Trade).filter(models.Trade.id == db_trade.id).first()
     return db_trade
 
+
 @app.get("/trades/", response_model=list[schemas.TradeResponse])
 def get_trades(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
+
+
+# ----- ADD THIS NEW ENDPOINT -----
+@app.get("/trades/{trade_id}", response_model=schemas.TradeResponse)
+def get_trade(trade_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    trade = db.query(models.Trade).filter(
+        models.Trade.id == trade_id,
+        models.Trade.user_id == current_user.id
+    ).first()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    return trade
+
 
 @app.put("/trades/{trade_id}", response_model=schemas.TradeResponse)
 async def update_trade(
