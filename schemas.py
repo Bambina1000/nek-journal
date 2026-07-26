@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from datetime import datetime, date  # <-- ADDED date import
+from datetime import datetime
 from typing import Optional
 
 # ===== USER =====
@@ -13,7 +13,8 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     created_at: datetime
-    class Config: orm_mode = True
+    class Config:
+        orm_mode = True
 
 class Token(BaseModel):
     access_token: str
@@ -37,7 +38,8 @@ class AccountCreate(AccountBase):
 class AccountResponse(AccountBase):
     id: int
     created_at: datetime
-    class Config: orm_mode = True
+    class Config:
+        orm_mode = True
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
@@ -68,17 +70,18 @@ class TradeCreate(BaseModel):
     account_id: Optional[int] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    # NEW
+    # NEW FIELDS
     status: Optional[str] = "Closed"
     journal_entry: Optional[str] = None
-    # ✅ ADD THIS LINE – FIX FOR DATE
-    trade_date: Optional[date] = None
+    # ✅ FIX: use created_at (datetime) instead of trade_date (date)
+    created_at: Optional[datetime] = None
 
 class TradeResponse(TradeCreate):
     id: int
     created_at: datetime
     account: Optional[AccountResponse] = None
-    class Config: orm_mode = True
+    class Config:
+        orm_mode = True
 
 class TradeUpdate(BaseModel):
     pair: Optional[str] = None
@@ -100,11 +103,11 @@ class TradeUpdate(BaseModel):
     account_id: Optional[int] = None
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
-    # NEW
+    # NEW FIELDS
     status: Optional[str] = None
     journal_entry: Optional[str] = None
-    # ✅ ADD THIS LINE – FIX FOR DATE
-    trade_date: Optional[date] = None
+    # ✅ FIX: use created_at (datetime) instead of trade_date (date)
+    created_at: Optional[datetime] = None
 
 # ===== WATCHLIST =====
 class WatchlistItemBase(BaseModel):
@@ -117,7 +120,8 @@ class WatchlistItemCreate(WatchlistItemBase):
 class WatchlistItemResponse(WatchlistItemBase):
     id: int
     added_at: datetime
-    class Config: orm_mode = True
+    class Config:
+        orm_mode = True
 
 # ===== REPORT SETTINGS =====
 class ReportSettingBase(BaseModel):
@@ -130,4 +134,5 @@ class ReportSettingCreate(ReportSettingBase):
 class ReportSettingResponse(ReportSettingBase):
     id: int
     last_sent: Optional[datetime] = None
-    class Config: orm_mode = True
+    class Config:
+        orm_mode = True

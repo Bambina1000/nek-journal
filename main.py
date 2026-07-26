@@ -129,7 +129,7 @@ async def get_current_user_info(current_user: models.User = Depends(get_current_
     return current_user
 
 
-# ---------- ACCOUNT ENDPOINTS (with auth) ----------
+# ---------- ACCOUNT ENDPOINTS ----------
 @app.post("/accounts/", response_model=schemas.AccountResponse)
 def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db),
                    current_user: models.User = Depends(get_current_user)):
@@ -171,7 +171,7 @@ def delete_account(account_id: int, db: Session = Depends(get_db),
     return {"message": "Account deleted"}
 
 
-# ---------- TRADE ENDPOINTS (with auth & new fields) ----------
+# ---------- TRADE ENDPOINTS (FIXED) ----------
 @app.post("/trades/", response_model=schemas.TradeResponse)
 async def create_trade(
         pair: str = Form(...),
@@ -193,7 +193,7 @@ async def create_trade(
         take_profit: float = Form(None),
         status: str = Form("Closed"),
         journal_entry: str = Form(None),
-        trade_date: str = Form(None),  # <=== ADDED THIS LINE
+        created_at: str = Form(None),          # <-- changed from trade_date
         before_image: UploadFile = File(None),
         after_image: UploadFile = File(None),
         db: Session = Depends(get_db),
@@ -214,6 +214,15 @@ async def create_trade(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(after_image.file, buffer)
         after_path = f"/static/uploads/{filename}"
+
+    # --- parse created_at ---
+    if created_at:
+        try:
+            parsed_dt = datetime.fromisoformat(created_at)  # e.g. "2026-07-23T14:30:00"
+        except ValueError:
+            parsed_dt = datetime.utcnow()
+    else:
+        parsed_dt = datetime.utcnow()
 
     trade_data = {
         "pair": pair,
@@ -237,13 +246,14 @@ async def create_trade(
         "take_profit": take_profit,
         "status": status,
         "journal_entry": journal_entry,
-        "trade_date": trade_date if trade_date else None,  # <=== ADDED THIS LINE
+        "created_at": parsed_dt,              # <-- store parsed datetime
         "user_id": current_user.id,
     }
     db_trade = models.Trade(**trade_data)
     db.add(db_trade)
     db.commit()
     db.refresh(db_trade)
+    # eager load account (so response includes account.name)
     db_trade = db.query(models.Trade).filter(models.Trade.id == db_trade.id).first()
     return db_trade
 
@@ -260,8 +270,21 @@ def update_trade(trade_id: int, trade: schemas.TradeUpdate, db: Session = Depend
                                              models.Trade.user_id == current_user.id).first()
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
-    for key, value in trade.dict(exclude_unset=True).items():
+
+    update_data = trade.dict(exclude_unset=True)
+
+    # --- if created_at is provided as a string, parse it ---
+    if 'created_at' in update_data and update_data['created_at'] is not None:
+        if isinstance(update_data['created_at'], str):
+            try:
+                update_data['created_at'] = datetime.fromisoformat(update_data['created_at'])
+            except ValueError:
+                # if invalid, we remove the key so we don't overwrite with None
+                del update_data['created_at']
+
+    for key, value in update_data.items():
         setattr(db_trade, key, value)
+
     db.commit()
     db.refresh(db_trade)
     return db_trade
@@ -370,7 +393,7 @@ def restore_data(data: dict, db: Session = Depends(get_db), current_user: models
     return {"message": "Data restored successfully"}
 
 
-# ---------- REPORT SETTINGS (Email Reports) ----------
+# ---------- REPORT SETTINGS ----------
 @app.post("/report-settings/", response_model=schemas.ReportSettingResponse)
 def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Depends(get_db),
                         current_user: models.User = Depends(get_current_user)):
@@ -378,7 +401,6 @@ def set_report_settings(settings: schemas.ReportSettingCreate, db: Session = Dep
     if existing:
         existing.email = settings.email
         existing.frequency = settings.frequency
-        # If you want to allow updating send_day, add it to schema and update here
     else:
         existing = models.ReportSetting(**settings.dict(), user_id=current_user.id)
         db.add(existing)
@@ -464,7 +486,6 @@ def scheduled_email_job():
         db.close()
 
 
-# ---------- MANUAL TEST ENDPOINT ----------
 @app.post("/send-test-report/")
 async def send_test_report(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Get the user's report settings
@@ -487,7 +508,7 @@ async def send_test_report(current_user: models.User = Depends(get_current_user)
         raise HTTPException(500, f"Failed to send: {str(e)}")
 
 
-# ---------- STATS (with auth) ----------
+# ---------- STATS ----------
 @app.get("/stats/")
 def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trades = db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
@@ -516,7 +537,7 @@ def get_stats(db: Session = Depends(get_db), current_user: models.User = Depends
     }
 
 
-# ---------- CSV EXPORT (with auth) ----------
+# ---------- CSV EXPORT ----------
 @app.get("/export/csv")
 def export_csv(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trades = db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()

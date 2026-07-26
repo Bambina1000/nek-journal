@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Date  # <-- ADDED Date
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -52,7 +52,7 @@ class Trade(Base):
     followed_plan = Column(String)
     mistakes = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)  # <-- will be overridden when frontend sends it
     before_image = Column(String, nullable=True)
     after_image = Column(String, nullable=True)
     confidence = Column(Integer, nullable=True)
@@ -61,11 +61,10 @@ class Trade(Base):
     take_profit = Column(Float, nullable=True)
 
     # NEW FIELDS
-    status = Column(String, default="Closed")  # "Open" or "Closed"
-    journal_entry = Column(Text, nullable=True)  # Long-form reflection
+    status = Column(String, default="Closed")       # "Open" or "Closed"
+    journal_entry = Column(Text, nullable=True)     # Long-form reflection
 
-    # ✅ ADD THIS LINE – The fix for the date!
-    trade_date = Column(Date, nullable=True)  # <-- ADDED
+    # Removed the extra 'trade_date' column – we use 'created_at' for the trade timestamp
 
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
