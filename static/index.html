@@ -23,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Major+Mono+Display&display=swap" rel="stylesheet" />
     <style>
-        /* === BASE THEME (same as before) === */
+        /* ===== BASE THEME (same as before) ===== */
         :root { --gold: #d4a853; --gold-light: #f5d68a; --gold-dark: #b8923a; --gold-glow: rgba(212,168,83,0.25); --bg-card: #141414; }
         .dark { --bg-body: #0a0a0a; --bg-card: #141414; --text-primary: #f5f5f5; --text-secondary: rgba(245,245,245,0.7); --border-color: rgba(212,168,83,0.15); }
         .light { --bg-body: #f5f7fa; --bg-card: #ffffff; --text-primary: #1a1a1a; --text-secondary: rgba(26,26,26,0.7); --border-color: rgba(212,168,83,0.25); }
@@ -343,21 +343,20 @@
         }
         .message-box .msg-buttons .msg-btn-danger:hover { background: #dc2626; }
 
-        /* ===== GLASSMORPHISM AUTH MODAL (FIXED – covers dashboard) ===== */
+        /* ===== CENTERED AUTH OVERLAY (covers everything) ===== */
         #authModal {
-            /* Remove conflicting styles */
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at 50% 40%, rgba(212,168,83,0.08) 0%, rgba(10,10,10,0.98) 80%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
         #authModal.show {
             display: flex !important;
-            align-items: center;
-            justify-content: center;
-            position: fixed;
-            inset: 0;
-            z-index: 1000;
-            /* Dark, blurry background – completely hides the dashboard */
-            background: radial-gradient(ellipse at 30% 40%, rgba(212,168,83,0.05) 0%, rgba(10,10,10,0.98) 80%);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
         }
         #authModal .glass-card {
             width: 100%;
@@ -375,7 +374,6 @@
             position: relative;
             overflow: hidden;
         }
-        /* Glass card inner glow */
         #authModal .glass-card::before {
             content: '';
             position: absolute;
@@ -389,7 +387,6 @@
             mask-composite: exclude;
             pointer-events: none;
         }
-        /* Subtle reflection at top */
         #authModal .glass-card::after {
             content: '';
             position: absolute;
@@ -519,7 +516,6 @@
             position: relative;
             z-index: 1;
         }
-        /* Mobile tweaks */
         @media (max-width: 480px) {
             #authModal .glass-card {
                 padding: 1.5rem;
@@ -530,14 +526,10 @@
                 font-size: 1.3rem;
             }
         }
-        /* The backdrop – subtle gold glow ring behind the card (optional) */
-        #authModal::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: radial-gradient(ellipse at 50% 40%, rgba(212,168,83,0.06) 0%, transparent 70%);
+        /* Ensure body content is hidden behind overlay */
+        #authModal.show ~ .content {
+            filter: blur(4px);
             pointer-events: none;
-            z-index: -1;
         }
     </style>
 </head>
@@ -1006,7 +998,7 @@
         </div>
     </div>
 
-    <!-- ===== AUTH MODAL – Glassmorphism with 3D tilt and full overlay ===== -->
+    <!-- ===== AUTH MODAL (centered, non-dismissible) ===== -->
     <div id="authModal" class="show">
         <div class="glass-card" id="glassCard">
             <h2>NEK JOURNAL</h2>
@@ -1070,34 +1062,26 @@
         // ============================================================
         const glassCard = document.getElementById('glassCard');
         if (glassCard) {
-            // Mouse move tilt
             document.addEventListener('mousemove', function(e) {
                 const rect = glassCard.getBoundingClientRect();
-                const x = (e.clientX - rect.left) / rect.width - 0.5;  // -0.5 to 0.5
+                const x = (e.clientX - rect.left) / rect.width - 0.5;
                 const y = (e.clientY - rect.top) / rect.height - 0.5;
-                const rotateY = x * 10;   // max 5 deg
-                const rotateX = -y * 10;  // max 5 deg
-                glassCard.style.transform =
-                    `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1)`;
+                const rotateY = x * 10;
+                const rotateX = -y * 10;
+                glassCard.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1)`;
                 glassCard.style.boxShadow =
                     `0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.05) inset, 0 0 40px rgba(212,168,83,${0.05 + Math.abs(x*y)*0.1})`;
             });
-
-            // Reset on mouse leave
             document.addEventListener('mouseleave', function() {
                 glassCard.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale(1)';
                 glassCard.style.boxShadow =
                     '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.05) inset, 0 0 40px rgba(212,168,83,0.05)';
             });
-
-            // Touch support – disable tilt on mobile (or keep subtle)
             let touchTimeout;
             document.addEventListener('touchstart', function() {
                 clearTimeout(touchTimeout);
                 glassCard.style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
-                touchTimeout = setTimeout(() => {
-                    glassCard.style.transition = '';
-                }, 1000);
+                touchTimeout = setTimeout(() => { glassCard.style.transition = ''; }, 1000);
             }, { passive: true });
         }
 
@@ -1216,8 +1200,7 @@
         function updateLightboxImage() {
             const img = document.getElementById('lightboxImage');
             img.src = lightboxImages[currentImageIndex];
-            document.getElementById('lightboxCounter').textContent =
-                `${currentImageIndex + 1} / ${lightboxImages.length}`;
+            document.getElementById('lightboxCounter').textContent = `${currentImageIndex + 1} / ${lightboxImages.length}`;
             document.getElementById('lightboxPrev').style.display = currentImageIndex > 0 ? 'flex' : 'none';
             document.getElementById('lightboxNext').style.display = currentImageIndex < lightboxImages.length - 1 ? 'flex' : 'none';
         }
@@ -1337,10 +1320,13 @@
         }
 
         // ============================================================
-        // FETCH DATA
+        // FETCH DATA (only if token exists)
         // ============================================================
         async function fetchAllData() {
-            if (!token) return;
+            if (!token) {
+                document.getElementById('authModal').classList.add('show');
+                return;
+            }
             await fetchAccounts();
             await fetchTrades();
             await fetchWatchlist();
@@ -1349,7 +1335,10 @@
         async function fetchAccounts() {
             try {
                 const res = await apiFetch(`${API_URL}/accounts/`);
-                if (!res.ok) throw new Error('Failed to fetch accounts');
+                if (!res.ok) {
+                    if (res.status === 401) { logout(); }
+                    throw new Error('Failed to fetch accounts');
+                }
                 allAccountsCache = await res.json();
                 populateAccountSelects();
                 renderAccountList();
@@ -1362,7 +1351,10 @@
         async function fetchTrades() {
             try {
                 const res = await apiFetch(`${API_URL}/trades/`);
-                if (!res.ok) throw new Error('Failed to fetch trades');
+                if (!res.ok) {
+                    if (res.status === 401) { logout(); }
+                    throw new Error('Failed to fetch trades');
+                }
                 allTradesCache = await res.json();
                 applyFiltersAndUpdate();
             } catch (err) {
@@ -1374,11 +1366,15 @@
         async function fetchWatchlist() {
             try {
                 const res = await apiFetch(`${API_URL}/watchlist/`);
-                if (!res.ok) throw new Error('Failed to fetch watchlist');
+                if (!res.ok) {
+                    if (res.status === 401) { logout(); }
+                    throw new Error('Failed to fetch watchlist');
+                }
                 allWatchlistCache = await res.json();
                 renderWatchlist();
             } catch (err) {
                 console.error('Watchlist fetch error:', err);
+                if (err.message.includes('401')) logout();
             }
         }
 
