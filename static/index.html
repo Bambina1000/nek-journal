@@ -342,6 +342,202 @@
             border-color: #ef4444;
         }
         .message-box .msg-buttons .msg-btn-danger:hover { background: #dc2626; }
+
+        /* ===== GLASSMORPHISM AUTH MODAL ===== */
+        /* Background with subtle animated gradient (pure CSS) */
+        #authModal {
+            background: none !important;
+            backdrop-filter: none !important;
+        }
+        #authModal.show {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: radial-gradient(ellipse at 30% 40%, rgba(212,168,83,0.08) 0%, rgba(10,10,10,0.95) 80%);
+        }
+        #authModal .glass-card {
+            width: 100%;
+            max-width: 440px;
+            padding: 2rem 2rem 2.2rem;
+            border-radius: 2rem;
+            background: rgba(20, 20, 20, 0.55);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(212, 168, 83, 0.2);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.05) inset, 0 0 40px rgba(212,168,83,0.05);
+            transition: transform 0.1s ease-out, box-shadow 0.3s ease;
+            transform: perspective(800px) rotateX(0deg) rotateY(0deg) scale(1);
+            will-change: transform;
+            position: relative;
+            overflow: hidden;
+        }
+        /* Glass card inner glow */
+        #authModal .glass-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 2rem;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(212,168,83,0.3), rgba(212,168,83,0.05), rgba(212,168,83,0.2));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+        /* Subtle reflection at top */
+        #authModal .glass-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 20% 10%, rgba(255,255,255,0.04) 0%, transparent 60%);
+            pointer-events: none;
+            border-radius: 2rem;
+        }
+        #authModal .glass-card h2 {
+            text-align: center;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--gold);
+            margin-bottom: 0.25rem;
+            letter-spacing: 0.02em;
+            text-shadow: 0 0 30px rgba(212,168,83,0.2);
+            position: relative;
+            z-index: 1;
+        }
+        #authModal .glass-card .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.7;
+            position: relative;
+            z-index: 1;
+        }
+        #authModal .glass-card .auth-tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 0.75rem;
+            padding: 0.25rem;
+            margin: 0 0 1.5rem 0;
+            position: relative;
+            z-index: 1;
+            border: 1px solid rgba(212,168,83,0.08);
+        }
+        #authModal .glass-card .auth-tabs button {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 0.6rem 0;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            border-radius: 0.6rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        #authModal .glass-card .auth-tabs button.active {
+            background: rgba(212,168,83,0.15);
+            color: var(--gold);
+            box-shadow: 0 0 20px rgba(212,168,83,0.05);
+        }
+        #authModal .glass-card .auth-tabs button:hover:not(.active) {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.03);
+        }
+        #authModal .glass-card form {
+            position: relative;
+            z-index: 1;
+        }
+        #authModal .glass-card .form-group {
+            margin-bottom: 1rem;
+        }
+        #authModal .glass-card .form-group label {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: rgba(212,168,83,0.6);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 0.3rem;
+        }
+        #authModal .glass-card .form-group input {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgba(212,168,83,0.15);
+            background: rgba(255,255,255,0.04);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            outline: none;
+        }
+        #authModal .glass-card .form-group input:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px rgba(212,168,83,0.1), 0 0 30px rgba(212,168,83,0.03);
+        }
+        #authModal .glass-card .form-group input::placeholder {
+            color: rgba(255,255,255,0.2);
+        }
+        #authModal .glass-card .btn-gold {
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            border-radius: 0.75rem;
+            margin-top: 0.5rem;
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+            color: #0a0a0a;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 25px rgba(212,168,83,0.25);
+        }
+        #authModal .glass-card .btn-gold:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 40px rgba(212,168,83,0.35);
+            background: linear-gradient(135deg, var(--gold-light), var(--gold));
+        }
+        #authModal .glass-card .btn-gold:active {
+            transform: translateY(0);
+        }
+        #authModal .glass-card #authMessage {
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--gold);
+            min-height: 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        /* Mobile tweaks */
+        @media (max-width: 480px) {
+            #authModal .glass-card {
+                padding: 1.5rem;
+                max-width: 95%;
+                border-radius: 1.5rem;
+            }
+            #authModal .glass-card h2 {
+                font-size: 1.3rem;
+            }
+        }
+        /* The backdrop – subtle gold glow ring behind the card */
+        #authModal::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 40%, rgba(212,168,83,0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: -1;
+        }
     </style>
 </head>
 <body>
@@ -809,27 +1005,42 @@
         </div>
     </div>
 
-    <!-- ===== AUTH MODAL ===== -->
-    <div id="authModal" class="modal-backdrop show">
-        <div class="modal-content slide-in" style="max-width:400px;margin:auto;">
-            <button class="close" onclick="closeAuth()">&times;</button>
-            <h2 style="text-align:center;">Welcome Back</h2>
-            <div style="display:flex;gap:1rem;border-bottom:1px solid var(--border-color);margin-bottom:1rem;">
-                <button onclick="switchAuthTab('login')" id="loginTab" class="active" style="background:none;border:none;padding:0.5rem 0;font-weight:700;color:var(--gold);border-bottom:2px solid var(--gold);flex:1;">Login</button>
-                <button onclick="switchAuthTab('register')" id="registerTab" style="background:none;border:none;padding:0.5rem 0;font-weight:700;color:var(--text-secondary);border-bottom:2px solid transparent;flex:1;">Register</button>
+    <!-- ===== AUTH MODAL – Glassmorphism with 3D tilt ===== -->
+    <div id="authModal" class="show">
+        <div class="glass-card" id="glassCard">
+            <h2>NEK JOURNAL</h2>
+            <p class="subtitle">Secure your trades</p>
+            <div class="auth-tabs">
+                <button onclick="switchAuthTab('login')" id="loginTab" class="active">Login</button>
+                <button onclick="switchAuthTab('register')" id="registerTab">Register</button>
             </div>
             <form id="loginForm" onsubmit="login(event)">
-                <div class="form-group"><label>Username</label><input type="text" id="login-username" required /></div>
-                <div class="form-group"><label>Password</label><input type="password" id="login-password" required /></div>
-                <button type="submit" class="btn-gold" style="width:100%;">Login</button>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="login-username" placeholder="Enter username" required />
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required />
+                </div>
+                <button type="submit" class="btn-gold">Login</button>
             </form>
             <form id="registerForm" style="display:none;" onsubmit="register(event)">
-                <div class="form-group"><label>Username</label><input type="text" id="reg-username" required /></div>
-                <div class="form-group"><label>Email</label><input type="email" id="reg-email" required /></div>
-                <div class="form-group"><label>Password</label><input type="password" id="reg-password" required /></div>
-                <button type="submit" class="btn-gold" style="width:100%;">Register</button>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="reg-username" placeholder="Choose a username" required />
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" placeholder="your@email.com" required />
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="reg-password" placeholder="••••••••" required />
+                </div>
+                <button type="submit" class="btn-gold">Create Account</button>
             </form>
-            <div id="authMessage" style="margin-top:1rem;text-align:center;color:var(--gold);"></div>
+            <div id="authMessage"></div>
         </div>
     </div>
 
@@ -853,6 +1064,43 @@
     </div>
 
     <script>
+        // ============================================================
+        // 3D TILT EFFECT (GLASS CARD)
+        // ============================================================
+        const glassCard = document.getElementById('glassCard');
+        if (glassCard) {
+            // Mouse move tilt
+            document.addEventListener('mousemove', function(e) {
+                const rect = glassCard.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width - 0.5;  // -0.5 to 0.5
+                const y = (e.clientY - rect.top) / rect.height - 0.5;
+                const rotateY = x * 10;   // max 5 deg
+                const rotateX = -y * 10;  // max 5 deg
+                glassCard.style.transform =
+                    `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1)`;
+                glassCard.style.boxShadow =
+                    `0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.05) inset, 0 0 40px rgba(212,168,83,${0.05 + Math.abs(x*y)*0.1})`;
+            });
+
+            // Reset on mouse leave
+            document.addEventListener('mouseleave', function() {
+                glassCard.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg) scale(1)';
+                glassCard.style.boxShadow =
+                    '0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,83,0.05) inset, 0 0 40px rgba(212,168,83,0.05)';
+            });
+
+            // Touch support – disable tilt on mobile (or keep subtle)
+            let touchTimeout;
+            document.addEventListener('touchstart', function() {
+                clearTimeout(touchTimeout);
+                glassCard.style.transition = 'transform 0.3s ease, box-shadow 0.3s ease';
+                touchTimeout = setTimeout(() => {
+                    glassCard.style.transition = '';
+                }, 1000);
+            }, { passive: true });
+        }
+
+
         // ============================================================
         // CUSTOM MESSAGE SYSTEM
         // ============================================================
@@ -1014,10 +1262,6 @@
             return fetch(url, { ...options, headers });
         }
 
-        function closeAuth() {
-            document.getElementById('authModal').classList.remove('show');
-        }
-
         function switchAuthTab(tab) {
             const loginTab = document.getElementById('loginTab');
             const registerTab = document.getElementById('registerTab');
@@ -1025,16 +1269,12 @@
             const registerForm = document.getElementById('registerForm');
             if (tab === 'login') {
                 loginTab.className = 'active';
-                loginTab.style.borderBottom = '2px solid var(--gold)';
                 registerTab.className = '';
-                registerTab.style.borderBottom = '2px solid transparent';
                 loginForm.style.display = 'block';
                 registerForm.style.display = 'none';
             } else {
                 registerTab.className = 'active';
-                registerTab.style.borderBottom = '2px solid var(--gold)';
                 loginTab.className = '';
-                loginTab.style.borderBottom = '2px solid transparent';
                 registerForm.style.display = 'block';
                 loginForm.style.display = 'none';
             }
@@ -1623,7 +1863,7 @@
         }
 
         // ============================================================
-        // TRADE SUBMIT (FormData for both POST and PUT) – NOW WITH BASE64
+        // TRADE SUBMIT (FormData for both POST and PUT)
         // ============================================================
         document.getElementById('tradeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1660,7 +1900,6 @@
             formData.append('journal_entry', document.getElementById('modal-journal').value || '');
             formData.append('created_at', createdAt);
 
-            // --- Convert images to Base64 and append as strings ---
             const beforeFile = document.getElementById('modal-before-image').files[0];
             const afterFile = document.getElementById('modal-after-image').files[0];
 
@@ -1699,9 +1938,7 @@
             }
         });
 
-        // ============================================================
         // Helper: Convert File to Base64
-        // ============================================================
         function toBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();

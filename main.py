@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, File, Form, UploadFile, status
+from fastapi import FastAPI, Depends, HTTPException, File, Form, UploadFile, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -21,34 +21,50 @@ import json
 import re
 from collections import Counter
 
-# ---------- CONFIG ----------
-SECRET_KEY = "your-super-secret-key-change-this-in-production"
+# ---------- RATE LIMITING ----------
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+
+# ---------- ENVIRONMENT VARIABLES ----------
+SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production-use-64-characters")
+if SECRET_KEY == "change-this-in-production-use-64-characters":
+    print("⚠️  WARNING: Using default SECRET_KEY. Set environment variable for production.")
+
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 10080   # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 1 day
+
+# Email config
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+
+# CORS allowed origins – split by comma
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://your-app.onrender.com,http://localhost:8000").split(",")
+# Trim whitespace
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# Email config (optional)
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USER = "your-email@gmail.com"
-SMTP_PASSWORD = "your-app-password"
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="NEK Journal", version="2.0.0")
 
-# CORS
+# ---------- RATE LIMITER ----------
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/hour"])
+app.state.limiter = limiter
+app.add_exception_handler(429, _rate_limit_exceeded_handler)
+
+# ---------- CORS (restricted) ----------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve static files (if any)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -106,7 +122,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return db_user
 
 @app.post("/token", response_model=schemas.Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("5/minute")   # rate limit login attempts
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
@@ -157,7 +174,9 @@ def delete_account(account_id: int, db: Session = Depends(get_db),
     return {"message": "Account deleted"}
 
 
-# ---------- TRADE ENDPOINTS (Base64 images) ----------
+# ---------- TRADE ENDPOINTS (with Base64 & size limit) ----------
+MAX_IMAGE_SIZE = 5 * 1024 * 1024   # 5 MB
+
 @app.post("/trades/", response_model=schemas.TradeResponse)
 async def create_trade(
         pair: str = Form(...),
@@ -180,11 +199,17 @@ async def create_trade(
         status: str = Form("Closed"),
         journal_entry: str = Form(None),
         created_at: str = Form(None),
-        before_image: str = Form(None),   # Base64 string
-        after_image: str = Form(None),    # Base64 string
+        before_image: str = Form(None),
+        after_image: str = Form(None),
         db: Session = Depends(get_db),
         current_user: models.User = Depends(get_current_user)
 ):
+    # Enforce image size limit
+    if before_image and len(before_image) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="Before image too large (max 5 MB)")
+    if after_image and len(after_image) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="After image too large (max 5 MB)")
+
     # Parse created_at
     if created_at:
         try:
@@ -226,11 +251,9 @@ async def create_trade(
     db_trade = db.query(models.Trade).filter(models.Trade.id == db_trade.id).first()
     return db_trade
 
-
 @app.get("/trades/", response_model=list[schemas.TradeResponse])
 def get_trades(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
-
 
 @app.put("/trades/{trade_id}", response_model=schemas.TradeResponse)
 async def update_trade(
@@ -260,6 +283,12 @@ async def update_trade(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # Enforce size limit if images are being updated
+    if before_image and len(before_image) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="Before image too large (max 5 MB)")
+    if after_image and len(after_image) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=413, detail="After image too large (max 5 MB)")
+
     db_trade = db.query(models.Trade).filter(
         models.Trade.id == trade_id,
         models.Trade.user_id == current_user.id
@@ -267,13 +296,11 @@ async def update_trade(
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
 
-    # Update images if new Base64 strings are provided
     if before_image is not None:
         db_trade.before_image = before_image
     if after_image is not None:
         db_trade.after_image = after_image
 
-    # Update date if provided
     if created_at:
         try:
             parsed_dt = datetime.fromisoformat(created_at)
@@ -281,7 +308,6 @@ async def update_trade(
         except ValueError:
             pass
 
-    # Update all other fields
     update_fields = {
         "pair": pair,
         "direction": direction,
@@ -309,7 +335,6 @@ async def update_trade(
     db.commit()
     db.refresh(db_trade)
     return db_trade
-
 
 @app.delete("/trades/{trade_id}")
 def delete_trade(trade_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -427,6 +452,9 @@ def get_report_settings(db: Session = Depends(get_db), current_user: models.User
     return settings
 
 def send_email_report(user_email: str, content: str):
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print("SMTP credentials not configured – email not sent.")
+        return
     msg = MIMEMultipart()
     msg["From"] = SMTP_USER
     msg["To"] = user_email
