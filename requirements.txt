@@ -9,3 +9,4 @@ email-validator
 pydantic[email]
 slowapi
 google-generativeai
+psycopg2-binary
