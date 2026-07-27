@@ -623,17 +623,18 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
     if not GOOGLE_API_KEY:
         raise HTTPException(status_code=503, detail="Google API key not configured")
 
-    # Fetch trades
+    # Only fetch last 10 trades to keep prompt short
     trades = db.query(models.Trade).filter(
         models.Trade.user_id == current_user.id
-    ).order_by(models.Trade.created_at.desc()).limit(30).all()
+    ).order_by(models.Trade.created_at.desc()).limit(10).all()
 
     if not trades:
         return {"advice": "You haven't logged any trades yet. Start trading and come back for insights!"}
 
-    # Build summaries
     trade_summaries = []
     for t in trades:
+        # Truncate journal entry to 500 chars to save tokens
+        journal = (t.journal_entry or 'N/A')[:500]
         summary = (
             f"Pair: {t.pair}, Direction: {t.direction}, "
             f"Entry: {t.entry_price}, Exit: {t.exit_price}, "
@@ -641,36 +642,27 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
             f"Mindset: {t.emotion_before or 'N/A'}, "
             f"Followed Plan: {t.followed_plan}, "
             f"Mistakes: {t.mistakes or 'None'}, "
-            f"Journal Entry: {t.journal_entry or 'N/A'}"
+            f"Journal Entry: {journal}"
         )
         trade_summaries.append(summary)
 
-    # Combined prompt (system + user)
     full_prompt = (
-        "You are a professional trading coach with decades of experience in forex, stocks, and futures. "
-        "Your role is to analyze a trader's journal, identify patterns, mistakes, and emotional biases, "
-        "and provide constructive, actionable advice to help them improve. Be direct, honest, and encouraging. "
-        "Focus on psychological mistakes, risk management, and consistency. "
-        "Give specific examples from the data and suggest concrete changes.\n\n"
-        "Here are the last trades of one of your students. Analyze the data and write a detailed coaching report.\n\n"
+        "You are a professional trading coach. Analyze the trader's journal and provide feedback.\n\n"
         "Trade Summaries:\n" + "\n".join(trade_summaries) + "\n\n"
-        "Please provide a structured report covering:\n"
-        "1. Overall performance (win rate, average R:R, net P&L).\n"
-        "2. Patterns & mistakes (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
-        "3. Strengths (what they did well).\n"
-        "4. Specific recommendations (what to stop doing, what to start doing).\n"
-        "5. Actionable habits to build.\n"
-        "Make it clear, concise, and supportive."
+        "Give a structured report with:\n"
+        "1. Overall performance\n"
+        "2. Patterns & mistakes\n"
+        "3. Strengths\n"
+        "4. Recommendations\n"
+        "5. Actionable habits"
     )
 
     genai.configure(api_key=GOOGLE_API_KEY)
 
-    # Use the models from your /debug/models endpoint
     model_names = [
-        "models/gemini-2.5-flash",      # fast, good quality
-        "models/gemini-2.0-flash",      # reliable fallback
-        "models/gemini-pro-latest",     # stable
-        "models/gemini-2.5-pro",        # best quality (slower)
+        "models/gemini-2.0-flash",
+        "models/gemini-2.0-flash-lite",
+        "models/gemini-1.5-flash",
     ]
     last_error = None
 
@@ -685,7 +677,7 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
             print(f"Model {model_name} failed: {last_error}")
             continue
 
-    raise HTTPException(status_code=500, detail=f"All Gemini models failed. Last error: {last_error}")
+    raise HTTPException(status_code=500, detail=f"All models failed. Last error: {last_error}")
 
 
 # ---------- ROOT ----------
