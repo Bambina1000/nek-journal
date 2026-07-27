@@ -531,6 +531,41 @@
             filter: blur(4px);
             pointer-events: none;
         }
+
+        /* ===== COACH RESPONSE STYLES ===== */
+        .coach-response {
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--text-primary);
+            padding: 1rem;
+            background: var(--bg-body);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            margin-top: 1rem;
+        }
+        .coach-response strong {
+            color: var(--gold);
+        }
+        .coach-response h1, .coach-response h2, .coach-response h3 {
+            color: var(--gold);
+            margin-top: 0.75rem;
+            margin-bottom: 0.3rem;
+        }
+        .coach-response ul, .coach-response ol {
+            padding-left: 1.5rem;
+            margin: 0.3rem 0;
+        }
+        .coach-response li {
+            margin: 0.2rem 0;
+        }
+        .coach-response .section-title {
+            display: block;
+            font-weight: 700;
+            color: var(--gold);
+            margin-top: 0.75rem;
+            font-size: 1.05rem;
+        }
     </style>
 </head>
 <body>
@@ -556,6 +591,11 @@
             <button onclick="switchView('watchlist'); closeSidebar();" id="nav-watchlist" class="nav-item">
                 <span>📋</span>
                 <span class="hidden-text">Watchlist</span>
+            </button>
+            <!-- ===== NEW COACH BUTTON ===== -->
+            <button onclick="switchView('coach'); closeSidebar();" id="nav-coach" class="nav-item">
+                <span>🤖</span>
+                <span class="hidden-text">Coach</span>
             </button>
         </nav>
         <div class="sidebar-footer">
@@ -790,6 +830,23 @@
                         <button onclick="addWatchlist()" class="btn-gold" style="padding:0.3rem 1rem;">Add</button>
                     </div>
                     <div id="watchlist-items"></div>
+                </div>
+            </div>
+
+            <!-- ===== NEW COACH VIEW ===== -->
+            <div id="view-coach" class="view">
+                <div class="card">
+                    <h3 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem;">
+                        🤖 AI Trading Coach
+                    </h3>
+                    <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;">
+                        Get personalised feedback on your trading habits, mistakes, and areas for improvement.
+                        The AI analyzes your last 30 trades and journal entries.
+                    </p>
+                    <button onclick="getCoachAdvice()" class="btn-gold" id="coachBtn" style="width:100%;padding:0.75rem;">
+                        Generate Coaching Report
+                    </button>
+                    <div id="coachAdvice" class="coach-response" style="margin-top:1rem;display:none;"></div>
                 </div>
             </div>
         </main>
@@ -2014,10 +2071,15 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('nav-' + view).classList.add('active');
             document.getElementById('view-title').textContent = view === 'dashboard' ? 'Dashboard' : view === 'analytics' ? 'Analytics' :
-                'Watchlist';
+                view === 'watchlist' ? 'Watchlist' : 'Coach';
             if (view === 'dashboard' && equityChartInstance) equityChartInstance.resize();
             if (view === 'analytics') renderAnalytics(allTradesCache);
             if (view === 'watchlist') renderWatchlist();
+            if (view === 'coach') {
+                // Reset the coach view
+                document.getElementById('coachBtn').disabled = false;
+                document.getElementById('coachBtn').textContent = 'Generate Coaching Report';
+            }
         }
 
         // ============================================================
@@ -2586,6 +2648,44 @@
                     }
                 }
             });
+        }
+
+        // ============================================================
+        // AI COACH: Generate coaching report
+        // ============================================================
+        async function getCoachAdvice() {
+            const btn = document.getElementById('coachBtn');
+            const adviceDiv = document.getElementById('coachAdvice');
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            adviceDiv.style.display = 'block';
+            adviceDiv.innerHTML = '<em style="color:var(--text-secondary);">⏳ Loading your coaching report...</em>';
+
+            try {
+                const res = await apiFetch(`${API_URL}/coach/`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!res.ok) {
+                    let errMsg = 'Failed to get advice';
+                    try {
+                        const err = await res.json();
+                        errMsg = err.detail || errMsg;
+                    } catch (e) {}
+                    throw new Error(errMsg);
+                }
+                const data = await res.json();
+                // Format the advice with proper line breaks
+                const formatted = data.advice.replace(/\n/g, '<br>');
+                adviceDiv.innerHTML = formatted;
+            } catch (err) {
+                adviceDiv.innerHTML = `<span style="color:#ef4444;">❌ Error: ${err.message}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Coaching Report';
+            }
         }
 
         // ============================================================

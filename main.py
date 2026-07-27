@@ -20,6 +20,7 @@ import io
 import json
 import re
 from collections import Counter
+import openai                     # <--- ADDED
 
 # ---------- RATE LIMITING ----------
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -38,6 +39,11 @@ SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+
+# OpenAI API key
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+if not OPENAI_API_KEY:
+    print("⚠️  WARNING: OPENAI_API_KEY not set. Coach feature will not work.")
 
 # CORS allowed origins – split by comma
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://your-app.onrender.com,http://localhost:8000").split(",")
@@ -257,7 +263,6 @@ def get_trades(db: Session = Depends(get_db), current_user: models.User = Depend
     return db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
 
 
-# ----- ADD THIS NEW ENDPOINT -----
 @app.get("/trades/{trade_id}", response_model=schemas.TradeResponse)
 def get_trade(trade_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trade = db.query(models.Trade).filter(
@@ -597,6 +602,71 @@ def export_csv(db: Session = Depends(get_db), current_user: models.User = Depend
     response = StreamingResponse(output, media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=trades_export.csv"
     return response
+
+
+# ---------- AI TRADING COACH ----------
+@app.post("/coach/")
+async def get_coach_advice(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="OpenAI API key not configured")
+
+    # Fetch last 30 trades (or all if fewer)
+    trades = db.query(models.Trade).filter(
+        models.Trade.user_id == current_user.id
+    ).order_by(models.Trade.created_at.desc()).limit(30).all()
+
+    if not trades:
+        return {"advice": "You haven't logged any trades yet. Start trading and come back for insights!"}
+
+    # Build summaries
+    trade_summaries = []
+    for t in trades:
+        summary = (
+            f"Pair: {t.pair}, Direction: {t.direction}, "
+            f"Entry: {t.entry_price}, Exit: {t.exit_price}, "
+            f"R:R: {t.risk_reward}, P&L: ${t.pnl:.2f}, "
+            f"Mindset: {t.emotion_before or 'N/A'}, "
+            f"Followed Plan: {t.followed_plan}, "
+            f"Mistakes: {t.mistakes or 'None'}, "
+            f"Journal Entry: {t.journal_entry or 'N/A'}"
+        )
+        trade_summaries.append(summary)
+
+    system_prompt = (
+        "You are a professional trading coach with decades of experience in forex, stocks, and futures. "
+        "Your role is to analyze a trader's journal, identify patterns, mistakes, and emotional biases, "
+        "and provide constructive, actionable advice to help them improve. Be direct, honest, and encouraging. "
+        "Focus on psychological mistakes, risk management, and consistency. "
+        "Give specific examples from the data and suggest concrete changes."
+    )
+
+    user_content = (
+        "Here are the last trades of one of your students. Analyze the data and write a detailed coaching report.\n\n"
+        "Trade Summaries:\n" + "\n".join(trade_summaries) + "\n\n"
+        "Please provide a structured report covering:\n"
+        "1. **Overall performance** (win rate, average R:R, net P&L).\n"
+        "2. **Patterns & mistakes** (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
+        "3. **Strengths** (what they did well).\n"
+        "4. **Specific recommendations** (what to stop doing, what to start doing).\n"
+        "5. **Actionable habits** to build.\n"
+        "Make it clear, concise, and supportive."
+    )
+
+    try:
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # you can change to "gpt-4" if you have access
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=0.7,
+            max_tokens=1500,
+        )
+        advice = response.choices[0].message.content
+        return {"advice": advice}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI error: {str(e)}")
 
 
 # ---------- ROOT ----------
