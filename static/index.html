@@ -23,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Major+Mono+Display&display=swap" rel="stylesheet" />
     <style>
-        /* ===== BASE THEME (same as before) ===== */
+        /* ===== BASE THEME ===== */
         :root { --gold: #d4a853; --gold-light: #f5d68a; --gold-dark: #b8923a; --gold-glow: rgba(212,168,83,0.25); --bg-card: #141414; }
         .dark { --bg-body: #0a0a0a; --bg-card: #141414; --text-primary: #f5f5f5; --text-secondary: rgba(245,245,245,0.7); --border-color: rgba(212,168,83,0.15); }
         .light { --bg-body: #f5f7fa; --bg-card: #ffffff; --text-primary: #1a1a1a; --text-secondary: rgba(26,26,26,0.7); --border-color: rgba(212,168,83,0.25); }
@@ -52,7 +52,6 @@
         @media (min-width: 768px) { .preview-container { width:80px; height:80px; } }
         .preview-container img { width:100%; height:100%; object-fit:cover; cursor:pointer; }
         .preview-container .placeholder { font-size:2rem; color:var(--gold); opacity:0.3; }
-        /* === CALENDAR DAY STYLES === */
         .calendar-day {
             transition: all 0.25s ease;
             border-radius: 0.5rem;
@@ -207,7 +206,6 @@
         .account-list-item .delete-account-btn:hover { background:#cc4444; }
         .metric-positive { color: #22c55e; }
         .metric-negative { color: #ef4444; }
-        /* === DETAIL MODAL === */
         .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem; }
         .detail-item { background:var(--bg-body); padding:0.5rem; border-radius:0.5rem; border:1px solid var(--border-color); }
         .detail-item .label { font-size:0.6rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; }
@@ -217,7 +215,6 @@
         .detail-image { max-width:100%; border-radius:0.5rem; border:1px solid var(--border-color); margin-top:0.25rem; cursor:pointer; transition:transform 0.15s, box-shadow 0.15s; }
         .detail-image:hover { transform:scale(1.02); box-shadow:0 0 15px rgba(212,168,83,0.3); }
         .detail-notes { white-space:pre-wrap; font-size:0.85rem; color:var(--text-secondary); }
-        /* === LIGHTBOX === */
         .lightbox-overlay {
             position: fixed;
             inset: 0;
@@ -285,7 +282,6 @@
             border-radius: 30px;
             font-family: 'Major Mono Display', monospace;
         }
-        /* === CUSTOM MESSAGE === */
         .message-overlay {
             position: fixed;
             inset: 0;
@@ -343,7 +339,7 @@
         }
         .message-box .msg-buttons .msg-btn-danger:hover { background: #dc2626; }
 
-        /* ===== CENTERED AUTH OVERLAY (covers everything) ===== */
+        /* ===== CENTERED AUTH OVERLAY ===== */
         #authModal {
             display: none;
             position: fixed;
@@ -526,13 +522,12 @@
                 font-size: 1.3rem;
             }
         }
-        /* Ensure body content is hidden behind overlay */
         #authModal.show ~ .content {
             filter: blur(4px);
             pointer-events: none;
         }
 
-        /* ===== COACH RESPONSE STYLES ===== */
+        /* ===== COACH RESPONSE ===== */
         .coach-response {
             white-space: pre-wrap;
             font-size: 0.9rem;
@@ -544,28 +539,11 @@
             border: 1px solid var(--border-color);
             margin-top: 1rem;
         }
-        .coach-response strong {
-            color: var(--gold);
-        }
-        .coach-response h1, .coach-response h2, .coach-response h3 {
-            color: var(--gold);
-            margin-top: 0.75rem;
-            margin-bottom: 0.3rem;
-        }
-        .coach-response ul, .coach-response ol {
-            padding-left: 1.5rem;
-            margin: 0.3rem 0;
-        }
-        .coach-response li {
-            margin: 0.2rem 0;
-        }
-        .coach-response .section-title {
-            display: block;
-            font-weight: 700;
-            color: var(--gold);
-            margin-top: 0.75rem;
-            font-size: 1.05rem;
-        }
+        .coach-response strong { color: var(--gold); }
+        .coach-response h1, .coach-response h2, .coach-response h3 { color: var(--gold); margin-top: 0.75rem; margin-bottom: 0.3rem; }
+        .coach-response ul, .coach-response ol { padding-left: 1.5rem; margin: 0.3rem 0; }
+        .coach-response li { margin: 0.2rem 0; }
+        .coach-response .section-title { display: block; font-weight: 700; color: var(--gold); margin-top: 0.75rem; font-size: 1.05rem; }
     </style>
 </head>
 <body>
@@ -592,7 +570,7 @@
                 <span>📋</span>
                 <span class="hidden-text">Watchlist</span>
             </button>
-            <!-- ===== NEW COACH BUTTON ===== -->
+            <!-- === COACH === -->
             <button onclick="switchView('coach'); closeSidebar();" id="nav-coach" class="nav-item">
                 <span>🤖</span>
                 <span class="hidden-text">Coach</span>
@@ -653,9 +631,8 @@
 
         <!-- MAIN -->
         <main class="main">
-            <!-- DASHBOARD VIEW -->
+            <!-- DASHBOARD -->
             <div id="view-dashboard" class="view active">
-                <!-- Metrics Cards -->
                 <div class="grid-3" style="margin-bottom:0.75rem;">
                     <div class="card">
                         <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;display:flex;justify-content:space-between;margin-bottom:0.4rem;">
@@ -701,18 +678,9 @@
                             </div>
                         </div>
                         <div style="margin-top:0.4rem;border-top:1px solid var(--border-color);padding-top:0.4rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem;text-align:center;">
-                            <div>
-                                <p style="font-size:0.45rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Streak</p>
-                                <p id="metric-current-streak" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:var(--gold);">0</p>
-                            </div>
-                            <div>
-                                <p style="font-size:0.45rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Best</p>
-                                <p id="metric-best-trade" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:var(--gold);">$0</p>
-                            </div>
-                            <div>
-                                <p style="font-size:0.45rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Worst</p>
-                                <p id="metric-worst-trade" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:#ff5555;">$0</p>
-                            </div>
+                            <div><p style="font-size:0.45rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Streak</p><p id="metric-current-streak" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:var(--gold);">0</p></div>
+                            <div><p style="font-size:0.45rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Best</p><p id="metric-best-trade" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:var(--gold);">$0</p></div>
+                            <div><p style="font-size:0.45rem;color:rgba(212,168,83,0.6);text-transform:uppercase;">Worst</p><p id="metric-worst-trade" style="font-family:'Major Mono Display',monospace;font-size:0.7rem;font-weight:700;color:#ff5555;">$0</p></div>
                         </div>
                     </div>
                     <div class="card">
@@ -732,7 +700,6 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Chart + Calendar -->
                 <div class="grid-2" style="margin-bottom:0.75rem;">
                     <div class="card">
@@ -756,71 +723,34 @@
                         </div>
                     </div>
                 </div>
-
                 <!-- Trade Table -->
                 <div class="card">
                     <h2 style="font-size:0.9rem;font-weight:700;color:var(--gold);margin-bottom:0.5rem;">Execution History</h2>
                     <div class="table-wrap">
                         <table>
                             <thead>
-                                <tr>
-                                    <th>Asset</th>
-                                    <th>Type</th>
-                                    <th>Setup</th>
-                                    <th>R</th>
-                                    <th>P&L</th>
-                                    <th>Mindset</th>
-                                    <th>Acct</th>
-                                    <th>Conf.</th>
-                                    <th>Sess</th>
-                                    <th>Status</th>
-                                    <th style="text-align:center;">Actions</th>
-                                </tr>
+                                <tr><th>Asset</th><th>Type</th><th>Setup</th><th>R</th><th>P&L</th><th>Mindset</th><th>Acct</th><th>Conf.</th><th>Sess</th><th>Status</th><th style="text-align:center;">Actions</th></tr>
                             </thead>
-                            <tbody id="tradesTableBody">
-                                <tr><td colspan="11" class="no-trades">No trades found.</td></tr>
-                            </tbody>
+                            <tbody id="tradesTableBody"><tr><td colspan="11" class="no-trades">No trades found.</td></tr></tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- ANALYTICS VIEW -->
+            <!-- ANALYTICS -->
             <div id="view-analytics" class="view">
                 <div class="grid-3" style="margin-bottom:0.75rem;">
-                    <div class="card">
-                        <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📊 P&L by Strategy</h3>
-                        <div style="height:150px;"><canvas id="strategyChart"></canvas></div>
-                    </div>
-                    <div class="card">
-                        <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📅 Monthly P&L</h3>
-                        <div style="height:150px;"><canvas id="monthlyChart"></canvas></div>
-                    </div>
-                    <div class="card">
-                        <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🎯 Win Rate</h3>
-                        <div style="height:150px;"><canvas id="winRateChart"></canvas></div>
-                    </div>
+                    <div class="card"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📊 P&L by Strategy</h3><div style="height:150px;"><canvas id="strategyChart"></canvas></div></div>
+                    <div class="card"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📅 Monthly P&L</h3><div style="height:150px;"><canvas id="monthlyChart"></canvas></div></div>
+                    <div class="card"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🎯 Win Rate</h3><div style="height:150px;"><canvas id="winRateChart"></canvas></div></div>
                 </div>
-                <div class="card" style="margin-top:0.75rem;">
-                    <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📊 R-Multiple Distribution</h3>
-                    <div style="height:150px;"><canvas id="rMultipleChart"></canvas></div>
-                    <p style="font-size:0.5rem;color:var(--text-secondary);margin-top:0.3rem;text-align:center;">R = profit / risk. Based on trades with stop loss set.</p>
-                </div>
-                <div class="card" style="margin-top:0.75rem;">
-                    <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🕒 Hourly P&L Heatmap</h3>
-                    <div style="height:150px;"><canvas id="hourlyChart"></canvas></div>
-                </div>
-                <div class="card" style="margin-top:0.75rem;">
-                    <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🕒 P&L by Session</h3>
-                    <div style="height:150px;"><canvas id="sessionChart"></canvas></div>
-                </div>
-                <div class="card" style="margin-top:0.75rem;">
-                    <h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📈 Trade Distribution</h3>
-                    <div style="height:150px;max-width:300px;margin:0 auto;"><canvas id="distributionChart"></canvas></div>
-                </div>
+                <div class="card" style="margin-top:0.75rem;"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📊 R-Multiple Distribution</h3><div style="height:150px;"><canvas id="rMultipleChart"></canvas></div><p style="font-size:0.5rem;color:var(--text-secondary);margin-top:0.3rem;text-align:center;">R = profit / risk. Based on trades with stop loss set.</p></div>
+                <div class="card" style="margin-top:0.75rem;"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🕒 Hourly P&L Heatmap</h3><div style="height:150px;"><canvas id="hourlyChart"></canvas></div></div>
+                <div class="card" style="margin-top:0.75rem;"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🕒 P&L by Session</h3><div style="height:150px;"><canvas id="sessionChart"></canvas></div></div>
+                <div class="card" style="margin-top:0.75rem;"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📈 Trade Distribution</h3><div style="height:150px;max-width:300px;margin:0 auto;"><canvas id="distributionChart"></canvas></div></div>
             </div>
 
-            <!-- WATCHLIST VIEW -->
+            <!-- WATCHLIST -->
             <div id="view-watchlist" class="view">
                 <div class="card">
                     <h3 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem;">📋 Watchlist</h3>
@@ -833,7 +763,7 @@
                 </div>
             </div>
 
-            <!-- ===== NEW COACH VIEW ===== -->
+            <!-- COACH -->
             <div id="view-coach" class="view">
                 <div class="card">
                     <h3 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem;">
@@ -872,19 +802,10 @@
             <h2 id="tradeModalTitle">Add New Trade</h2>
             <form id="tradeForm">
                 <input type="hidden" id="editTradeId" value="" />
-                <div class="form-group">
-                    <label>Instrument / Pair</label>
-                    <input type="text" id="modal-pair" placeholder="e.g. GBP/JPY" required />
-                </div>
+                <div class="form-group"><label>Instrument / Pair</label><input type="text" id="modal-pair" placeholder="e.g. GBP/JPY" required /></div>
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Direction</label>
-                        <select id="modal-direction"><option value="BUY">Long</option><option value="SELL">Short</option></select>
-                    </div>
-                    <div class="form-group">
-                        <label>Position Size</label>
-                        <input type="number" step="any" id="modal-position_size" placeholder="1.0" required />
-                    </div>
+                    <div class="form-group"><label>Direction</label><select id="modal-direction"><option value="BUY">Long</option><option value="SELL">Short</option></select></div>
+                    <div class="form-group"><label>Position Size</label><input type="number" step="any" id="modal-position_size" placeholder="1.0" required /></div>
                 </div>
                 <div class="form-row-3">
                     <div class="form-group"><label>Entry</label><input type="number" step="any" id="modal-entry" placeholder="0.00" required /></div>
@@ -900,34 +821,13 @@
                     <div class="form-group"><label>Tags</label><input type="text" id="modal-tags" placeholder="trend, momentum" /></div>
                 </div>
                 <div class="form-group"><label>Risk/Reward (R)</label><input type="number" step="any" id="modal-risk_reward" placeholder="2.5" required /></div>
-
                 <div class="form-row">
-                    <div class="form-group"><label>Account</label>
-                        <select id="modal-account">
-                            <option value="">-- Select --</option>
-                        </select>
-                    </div>
-                    <div class="form-group"><label>Session</label>
-                        <select id="modal-session">
-                            <option value="">-- Select --</option>
-                            <option value="Asia">Asia</option>
-                            <option value="London">London</option>
-                            <option value="New York">New York</option>
-                        </select>
-                    </div>
+                    <div class="form-group"><label>Account</label><select id="modal-account"><option value="">-- Select --</option></select></div>
+                    <div class="form-group"><label>Session</label><select id="modal-session"><option value="">-- Select --</option><option value="Asia">Asia</option><option value="London">London</option><option value="New York">New York</option></select></div>
                 </div>
-
-                <!-- Trade Status & Confidence -->
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Trade Status</label>
-                        <select id="modal-status">
-                            <option value="Closed">Closed</option>
-                            <option value="Open">Open</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Confidence Level</label>
+                    <div class="form-group"><label>Trade Status</label><select id="modal-status"><option value="Closed">Closed</option><option value="Open">Open</option></select></div>
+                    <div class="form-group"><label>Confidence Level</label>
                         <div class="confidence-container">
                             <span class="confidence-label">1</span>
                             <div class="confidence-dots" id="confidenceDots"></div>
@@ -937,14 +837,7 @@
                         <input type="hidden" id="modal-confidence" value="" />
                     </div>
                 </div>
-
-                <!-- Journal Entry -->
-                <div class="form-group">
-                    <label>Journal Entry (Reflection)</label>
-                    <textarea id="modal-journal" rows="4" placeholder="Write your full reflection here..."></textarea>
-                </div>
-
-                <!-- Screenshots -->
+                <div class="form-group"><label>Journal Entry (Reflection)</label><textarea id="modal-journal" rows="4" placeholder="Write your full reflection here..."></textarea></div>
                 <div class="form-group">
                     <label>Before Trade Screenshot</label>
                     <div class="file-input-wrapper">
@@ -965,7 +858,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="hr"></div>
                 <h3 style="font-size:0.75rem;font-weight:700;color:var(--gold);">Exit Details</h3>
                 <div class="form-row">
@@ -976,14 +868,12 @@
                     <input type="checkbox" id="modal-completed" checked style="width:auto;accent-color:var(--gold);" />
                     <label for="modal-completed" style="font-size:0.75rem;color:rgba(212,168,83,0.6);">Trade is completed</label>
                 </div>
-
                 <div class="hr"></div>
                 <h3 style="font-size:0.75rem;font-weight:700;color:var(--gold);">Reflection</h3>
                 <div class="form-group"><label>Mindset</label><input type="text" id="modal-emotion" placeholder="Calm / FOMO" required /></div>
                 <div class="form-group"><label>Followed Plan?</label><select id="modal-followed_plan"><option value="YES">YES</option><option value="NO">NO</option></select></div>
                 <div class="form-group"><label>Mistakes</label><input type="text" id="modal-mistakes" placeholder="None" /></div>
                 <div class="form-group"><label>Notes</label><textarea id="modal-notes" rows="2" placeholder="Execution details..."></textarea></div>
-
                 <div class="flex-end">
                     <button type="button" class="cancel" id="cancelModalBtn">Cancel</button>
                     <button type="submit" class="btn-gold" id="submitTradeBtn">Log Trade</button>
@@ -999,43 +889,16 @@
             <h2>Add Trading Account</h2>
             <p style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem;">Track P&L separately for each broker or prop firm account.</p>
             <form id="accountForm">
-                <div class="form-group">
-                    <label>Account Name *</label>
-                    <input type="text" id="acc-name" placeholder="e.g., FTMO Challenge 100k" required />
+                <div class="form-group"><label>Account Name *</label><input type="text" id="acc-name" placeholder="e.g., FTMO Challenge 100k" required /></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Starting Balance ($)</label><input type="number" step="any" id="acc-starting-balance" placeholder="10000" /></div>
+                    <div class="form-group"><label>Broker / Prop Firm</label><input type="text" id="acc-broker" placeholder="e.g., FTMO, Topstep" /></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Starting Balance ($)</label>
-                        <input type="number" step="any" id="acc-starting-balance" placeholder="10000" />
-                    </div>
-                    <div class="form-group">
-                        <label>Broker / Prop Firm</label>
-                        <input type="text" id="acc-broker" placeholder="e.g., FTMO, Topstep" />
-                    </div>
+                    <div class="form-group"><label>Account Type</label><select id="acc-type"><option value="Challenge">Challenge</option><option value="Real">Real</option><option value="Demo">Demo</option><option value="Evaluation">Evaluation</option><option value="Other">Other</option></select></div>
+                    <div class="form-group"><label>Status</label><select id="acc-status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Account Type</label>
-                        <select id="acc-type">
-                            <option value="Challenge">Challenge</option>
-                            <option value="Real">Real</option>
-                            <option value="Demo">Demo</option>
-                            <option value="Evaluation">Evaluation</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select id="acc-status">
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Purchase Cost (Optional) ($)</label>
-                    <input type="number" step="any" id="acc-purchase-cost" placeholder="0" />
-                </div>
+                <div class="form-group"><label>Purchase Cost (Optional) ($)</label><input type="number" step="any" id="acc-purchase-cost" placeholder="0" /></div>
                 <div class="flex-end">
                     <button type="button" class="cancel" onclick="closeAddAccountModal()">Cancel</button>
                     <button type="submit" class="btn-gold">Add Account</button>
@@ -1049,13 +912,11 @@
         <div class="modal-content slide-in" style="max-width:500px;">
             <button class="close" onclick="closeManageAccountsModal()">&times;</button>
             <h2>Manage Accounts</h2>
-            <div id="accountListContainer">
-                <!-- accounts will be listed here -->
-            </div>
+            <div id="accountListContainer"></div>
         </div>
     </div>
 
-    <!-- ===== AUTH MODAL (centered, non-dismissible) ===== -->
+    <!-- ===== AUTH MODAL ===== -->
     <div id="authModal" class="show">
         <div class="glass-card" id="glassCard">
             <h2>NEK JOURNAL</h2>
@@ -1065,29 +926,14 @@
                 <button onclick="switchAuthTab('register')" id="registerTab">Register</button>
             </div>
             <form id="loginForm" onsubmit="login(event)">
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="login-username" placeholder="Enter username" required />
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="login-password" placeholder="••••••••" required />
-                </div>
+                <div class="form-group"><label>Username</label><input type="text" id="login-username" placeholder="Enter username" required /></div>
+                <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="••••••••" required /></div>
                 <button type="submit" class="btn-gold">Login</button>
             </form>
             <form id="registerForm" style="display:none;" onsubmit="register(event)">
-                <div class="form-group">
-                    <label>Username</label>
-                    <input type="text" id="reg-username" placeholder="Choose a username" required />
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="reg-email" placeholder="your@email.com" required />
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" id="reg-password" placeholder="••••••••" required />
-                </div>
+                <div class="form-group"><label>Username</label><input type="text" id="reg-username" placeholder="Choose a username" required /></div>
+                <div class="form-group"><label>Email</label><input type="email" id="reg-email" placeholder="your@email.com" required /></div>
+                <div class="form-group"><label>Password</label><input type="password" id="reg-password" placeholder="••••••••" required /></div>
                 <button type="submit" class="btn-gold">Create Account</button>
             </form>
             <div id="authMessage"></div>
@@ -1103,7 +949,7 @@
         <div class="lightbox-counter" id="lightboxCounter">1 / 1</div>
     </div>
 
-    <!-- ===== CUSTOM MESSAGE MODAL ===== -->
+    <!-- ===== CUSTOM MESSAGE ===== -->
     <div id="customMessage" class="message-overlay">
         <div class="message-box">
             <div class="msg-icon" id="msgIcon">🔔</div>
@@ -1115,7 +961,7 @@
 
     <script>
         // ============================================================
-        // 3D TILT EFFECT (GLASS CARD)
+        // 3D TILT
         // ============================================================
         const glassCard = document.getElementById('glassCard');
         if (glassCard) {
@@ -1277,7 +1123,7 @@
         }
 
         // ============================================================
-        // HELPER: Fetch a single trade by ID (FRESH from server)
+        // HELPER: fetch single trade
         // ============================================================
         async function fetchTradeById(id) {
             try {
@@ -1391,7 +1237,7 @@
         }
 
         // ============================================================
-        // FETCH DATA (only if token exists)
+        // FETCH DATA
         // ============================================================
         async function fetchAllData() {
             if (!token) {
@@ -1731,7 +1577,7 @@
         }
 
         // ============================================================
-        // TRADE DETAIL VIEW (with lightbox) – always fetches fresh data
+        // TRADE DETAIL VIEW
         // ============================================================
         async function openTradeDetail(id) {
             const trade = await fetchTradeById(id);
@@ -1803,7 +1649,6 @@
                 `;
             }
 
-            // Screenshots – with lightbox
             const beforeImg = trade.before_image;
             const afterImg = trade.after_image;
             if (beforeImg || afterImg) {
@@ -1891,7 +1736,6 @@
             if (trade.confidence) setConfidence(trade.confidence);
             else resetConfidence();
 
-            // Show existing images
             if (trade.before_image) {
                 document.getElementById('before-preview').src = trade.before_image;
                 document.getElementById('before-preview').classList.remove('hidden');
@@ -1934,7 +1778,7 @@
         }
 
         // ============================================================
-        // TRADE SUBMIT (FormData for both POST and PUT)
+        // TRADE SUBMIT
         // ============================================================
         document.getElementById('tradeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2009,7 +1853,6 @@
             }
         });
 
-        // Helper: Convert File to Base64
         function toBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -2076,7 +1919,6 @@
             if (view === 'analytics') renderAnalytics(allTradesCache);
             if (view === 'watchlist') renderWatchlist();
             if (view === 'coach') {
-                // Reset the coach view
                 document.getElementById('coachBtn').disabled = false;
                 document.getElementById('coachBtn').textContent = 'Generate Coaching Report';
             }
@@ -2195,11 +2037,10 @@
         }
 
         // ============================================================
-        // EQUITY CURVE – FIXED: sorted by date
+        // EQUITY CURVE
         // ============================================================
         function renderEquityCurve(trades, baseCapital) {
             const ctx = document.getElementById('equityCurveChart').getContext('2d');
-            // Sort trades chronologically by created_at
             const sorted = [...trades].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             let running = baseCapital;
             const labels = ['Start'];
@@ -2651,7 +2492,7 @@
         }
 
         // ============================================================
-        // AI COACH: Generate coaching report
+        // AI COACH
         // ============================================================
         async function getCoachAdvice() {
             const btn = document.getElementById('coachBtn');
@@ -2662,24 +2503,19 @@
             adviceDiv.innerHTML = '<em style="color:var(--text-secondary);">⏳ Loading your coaching report...</em>';
 
             try {
-                const res = await apiFetch(`${API_URL}/coach/`, {
+                const response = await apiFetch(`${API_URL}/coach/`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
                 });
-                if (!res.ok) {
-                    let errMsg = 'Failed to get advice';
+                if (!response.ok) {
+                    let errorText = `HTTP ${response.status}`;
                     try {
-                        const err = await res.json();
-                        errMsg = err.detail || errMsg;
+                        const errData = await response.json();
+                        errorText = errData.detail || errorText;
                     } catch (e) {}
-                    throw new Error(errMsg);
+                    throw new Error(errorText);
                 }
-                const data = await res.json();
-                // Format the advice with proper line breaks
-                const formatted = data.advice.replace(/\n/g, '<br>');
-                adviceDiv.innerHTML = formatted;
+                const data = await response.json();
+                adviceDiv.innerHTML = data.advice.replace(/\n/g, '<br>');
             } catch (err) {
                 adviceDiv.innerHTML = `<span style="color:#ef4444;">❌ Error: ${err.message}</span>`;
             } finally {
@@ -2715,7 +2551,6 @@
             window.toggleSidebar = toggleSidebar;
             window.closeSidebar = closeSidebar;
 
-            // Lightbox event listeners
             document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
             document.getElementById('lightboxPrev').addEventListener('click', prevImage);
             document.getElementById('lightboxNext').addEventListener('click', nextImage);
