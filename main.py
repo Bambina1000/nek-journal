@@ -604,7 +604,27 @@ def export_csv(db: Session = Depends(get_db), current_user: models.User = Depend
     return response
 
 
-# ---------- AI TRADING COACH (Google Gemini - FREE) ----------
+# ---------- DEBUG: LIST AVAILABLE MODELS ----------
+@app.get("/debug/models")
+async def list_available_models():
+    if not GOOGLE_API_KEY:
+        raise HTTPException(status_code=503, detail="Google API key not configured")
+    try:
+        genai.configure(api_key=GOOGLE_API_KEY)
+        models = genai.list_models()
+        available = []
+        for m in models:
+            available.append({
+                "name": m.name,
+                "display_name": m.display_name,
+                "supported_methods": m.supported_generation_methods
+            })
+        return {"models": available}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- AI TRADING COACH (with auto-detection) ----------
 @app.post("/coach/")
 async def get_coach_advice(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not GOOGLE_API_KEY:
@@ -618,6 +638,7 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
     if not trades:
         return {"advice": "You haven't logged any trades yet. Start trading and come back for insights!"}
 
+    # Build summaries
     trade_summaries = []
     for t in trades:
         summary = (
@@ -631,34 +652,65 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
         )
         trade_summaries.append(summary)
 
-    prompt = (
-        "You are a professional trading coach. Analyze the trader's journal and provide detailed feedback.\n\n"
+    system_prompt = (
+        "You are a professional trading coach with decades of experience in forex, stocks, and futures. "
+        "Your role is to analyze a trader's journal, identify patterns, mistakes, and emotional biases, "
+        "and provide constructive, actionable advice to help them improve. Be direct, honest, and encouraging. "
+        "Focus on psychological mistakes, risk management, and consistency. "
+        "Give specific examples from the data and suggest concrete changes."
+    )
+
+    user_content = (
+        "Here are the last trades of one of your students. Analyze the data and write a detailed coaching report.\n\n"
         "Trade Summaries:\n" + "\n".join(trade_summaries) + "\n\n"
         "Please provide a structured report covering:\n"
-        "1. Overall performance (win rate, average R:R, net P&L).\n"
-        "2. Patterns & mistakes (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
-        "3. Strengths (what they did well).\n"
-        "4. Specific recommendations (what to stop doing, what to start doing).\n"
-        "5. Actionable habits to build.\n"
+        "1. **Overall performance** (win rate, average R:R, net P&L).\n"
+        "2. **Patterns & mistakes** (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
+        "3. **Strengths** (what they did well).\n"
+        "4. **Specific recommendations** (what to stop doing, what to start doing).\n"
+        "5. **Actionable habits** to build.\n"
         "Make it clear, concise, and supportive."
     )
 
+    genai.configure(api_key=GOOGLE_API_KEY)
+
+    # Auto-detect a working model
     try:
-        genai.configure(api_key=GOOGLE_API_KEY)
-        # Use gemini-pro (the most stable free model)
-        model = genai.GenerativeModel(model_name="gemini-pro")
-        response = model.generate_content(prompt)
+        models = genai.list_models()
+        selected_model = None
+        for model in models:
+            if "generateContent" in model.supported_generation_methods and "tuned" not in model.name:
+                selected_model = model.name
+                break
+        if not selected_model:
+            # Fallback to common model names
+            fallback_models = [
+                "models/gemini-1.5-flash",
+                "models/gemini-1.5-pro",
+                "models/gemini-1.0-pro"
+            ]
+            for candidate in fallback_models:
+                try:
+                    genai.get_model(candidate)
+                    selected_model = candidate
+                    break
+                except:
+                    continue
+        if not selected_model:
+            raise Exception("No suitable model found. Please check your API key and permissions.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error selecting model: {str(e)}")
+
+    try:
+        model = genai.GenerativeModel(
+            model_name=selected_model,
+            system_instruction=system_prompt
+        )
+        response = model.generate_content(user_content)
         advice = response.text
         return {"advice": advice}
     except Exception as e:
-        # If gemini-pro fails, try gemini-1.5-flash as fallback
-        try:
-            model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-            response = model.generate_content(prompt)
-            advice = response.text
-            return {"advice": advice}
-        except Exception as e2:
-            raise HTTPException(status_code=500, detail=f"Gemini error: {str(e2)}")
+        raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
 
 
 # ---------- ROOT ----------
