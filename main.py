@@ -665,12 +665,12 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
 
     genai.configure(api_key=GOOGLE_API_KEY)
 
-    # List of model names to try (most reliable first)
+    # Use the models from your /debug/models endpoint
     model_names = [
-        "gemini-1.5-flash",
-        "gemini-1.0-pro",
-        "models/gemini-1.5-flash",
-        "models/gemini-1.0-pro"
+        "models/gemini-2.5-flash",      # fast, good quality
+        "models/gemini-2.0-flash",      # reliable fallback
+        "models/gemini-pro-latest",     # stable
+        "models/gemini-2.5-pro",        # best quality (slower)
     ]
     last_error = None
 
@@ -682,9 +682,9 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
             return {"advice": advice}
         except Exception as e:
             last_error = str(e)
+            print(f"Model {model_name} failed: {last_error}")
             continue
 
-    # If all fail, raise error
     raise HTTPException(status_code=500, detail=f"All Gemini models failed. Last error: {last_error}")
 
 
