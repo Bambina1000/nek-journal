@@ -631,47 +631,34 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
         )
         trade_summaries.append(summary)
 
-    system_prompt = (
-        "You are a professional trading coach with decades of experience in forex, stocks, and futures. "
-        "Your role is to analyze a trader's journal, identify patterns, mistakes, and emotional biases, "
-        "and provide constructive, actionable advice to help them improve. Be direct, honest, and encouraging. "
-        "Focus on psychological mistakes, risk management, and consistency. "
-        "Give specific examples from the data and suggest concrete changes."
-    )
-
-    user_content = (
-        "Here are the last trades of one of your students. Analyze the data and write a detailed coaching report.\n\n"
+    prompt = (
+        "You are a professional trading coach. Analyze the trader's journal and provide detailed feedback.\n\n"
         "Trade Summaries:\n" + "\n".join(trade_summaries) + "\n\n"
         "Please provide a structured report covering:\n"
-        "1. **Overall performance** (win rate, average R:R, net P&L).\n"
-        "2. **Patterns & mistakes** (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
-        "3. **Strengths** (what they did well).\n"
-        "4. **Specific recommendations** (what to stop doing, what to start doing).\n"
-        "5. **Actionable habits** to build.\n"
+        "1. Overall performance (win rate, average R:R, net P&L).\n"
+        "2. Patterns & mistakes (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
+        "3. Strengths (what they did well).\n"
+        "4. Specific recommendations (what to stop doing, what to start doing).\n"
+        "5. Actionable habits to build.\n"
         "Make it clear, concise, and supportive."
     )
 
-    # List of models to try in order (most reliable first)
-    model_names = ["gemini-1.0-pro", "gemini-1.5-flash", "gemini-1.5-pro"]
-    last_error = None
-
-    for model_name in model_names:
+    try:
+        genai.configure(api_key=GOOGLE_API_KEY)
+        # Use gemini-pro (the most stable free model)
+        model = genai.GenerativeModel(model_name="gemini-pro")
+        response = model.generate_content(prompt)
+        advice = response.text
+        return {"advice": advice}
+    except Exception as e:
+        # If gemini-pro fails, try gemini-1.5-flash as fallback
         try:
-            genai.configure(api_key=GOOGLE_API_KEY)
-            model = genai.GenerativeModel(
-                model_name=model_name,
-                system_instruction=system_prompt
-            )
-            response = model.generate_content(user_content)
+            model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+            response = model.generate_content(prompt)
             advice = response.text
             return {"advice": advice}
-        except Exception as e:
-            last_error = str(e)
-            print(f"Model {model_name} failed: {last_error}")
-            continue
-
-    # If all models fail, return error
-    raise HTTPException(status_code=500, detail=f"All Gemini models failed. Last error: {last_error}")
+        except Exception as e2:
+            raise HTTPException(status_code=500, detail=f"Gemini error: {str(e2)}")
 
 
 # ---------- ROOT ----------
