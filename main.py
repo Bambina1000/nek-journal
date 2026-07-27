@@ -20,7 +20,7 @@ import io
 import json
 import re
 from collections import Counter
-import google.generativeai as genai   # <--- ADDED
+import google.generativeai as genai
 
 # ---------- RATE LIMITING ----------
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -47,7 +47,6 @@ if not GOOGLE_API_KEY:
 
 # CORS allowed origins – split by comma
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://your-app.onrender.com,http://localhost:8000").split(",")
-# Trim whitespace
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()]
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -128,7 +127,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return db_user
 
 @app.post("/token", response_model=schemas.Token)
-@limiter.limit("5/minute")   # rate limit login attempts
+@limiter.limit("5/minute")
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -180,8 +179,8 @@ def delete_account(account_id: int, db: Session = Depends(get_db),
     return {"message": "Account deleted"}
 
 
-# ---------- TRADE ENDPOINTS (with Base64 & size limit) ----------
-MAX_IMAGE_SIZE = 5 * 1024 * 1024   # 5 MB
+# ---------- TRADE ENDPOINTS ----------
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 @app.post("/trades/", response_model=schemas.TradeResponse)
 async def create_trade(
@@ -210,13 +209,11 @@ async def create_trade(
         db: Session = Depends(get_db),
         current_user: models.User = Depends(get_current_user)
 ):
-    # Enforce image size limit
     if before_image and len(before_image) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=413, detail="Before image too large (max 5 MB)")
     if after_image and len(after_image) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=413, detail="After image too large (max 5 MB)")
 
-    # Parse created_at
     if created_at:
         try:
             parsed_dt = datetime.fromisoformat(created_at)
@@ -257,11 +254,9 @@ async def create_trade(
     db_trade = db.query(models.Trade).filter(models.Trade.id == db_trade.id).first()
     return db_trade
 
-
 @app.get("/trades/", response_model=list[schemas.TradeResponse])
 def get_trades(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
-
 
 @app.get("/trades/{trade_id}", response_model=schemas.TradeResponse)
 def get_trade(trade_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -272,7 +267,6 @@ def get_trade(trade_id: int, db: Session = Depends(get_db), current_user: models
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     return trade
-
 
 @app.put("/trades/{trade_id}", response_model=schemas.TradeResponse)
 async def update_trade(
@@ -302,7 +296,6 @@ async def update_trade(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Enforce size limit if images are being updated
     if before_image and len(before_image) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=413, detail="Before image too large (max 5 MB)")
     if after_image and len(after_image) > MAX_IMAGE_SIZE:
@@ -611,9 +604,9 @@ async def list_available_models():
         raise HTTPException(status_code=503, detail="Google API key not configured")
     try:
         genai.configure(api_key=GOOGLE_API_KEY)
-        models = genai.list_models()
+        gemini_models = genai.list_models()
         available = []
-        for m in models:
+        for m in gemini_models:
             available.append({
                 "name": m.name,
                 "display_name": m.display_name,
@@ -624,13 +617,13 @@ async def list_available_models():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ---------- AI TRADING COACH (with auto-detection) ----------
+# ---------- AI TRADING COACH (FIXED) ----------
 @app.post("/coach/")
 async def get_coach_advice(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not GOOGLE_API_KEY:
         raise HTTPException(status_code=503, detail="Google API key not configured")
 
-    # Fetch last 30 trades
+    # Fetch trades
     trades = db.query(models.Trade).filter(
         models.Trade.user_id == current_user.id
     ).order_by(models.Trade.created_at.desc()).limit(30).all()
@@ -652,65 +645,47 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
         )
         trade_summaries.append(summary)
 
-    system_prompt = (
+    # Combined prompt (system + user)
+    full_prompt = (
         "You are a professional trading coach with decades of experience in forex, stocks, and futures. "
         "Your role is to analyze a trader's journal, identify patterns, mistakes, and emotional biases, "
         "and provide constructive, actionable advice to help them improve. Be direct, honest, and encouraging. "
         "Focus on psychological mistakes, risk management, and consistency. "
-        "Give specific examples from the data and suggest concrete changes."
-    )
-
-    user_content = (
+        "Give specific examples from the data and suggest concrete changes.\n\n"
         "Here are the last trades of one of your students. Analyze the data and write a detailed coaching report.\n\n"
         "Trade Summaries:\n" + "\n".join(trade_summaries) + "\n\n"
         "Please provide a structured report covering:\n"
-        "1. **Overall performance** (win rate, average R:R, net P&L).\n"
-        "2. **Patterns & mistakes** (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
-        "3. **Strengths** (what they did well).\n"
-        "4. **Specific recommendations** (what to stop doing, what to start doing).\n"
-        "5. **Actionable habits** to build.\n"
+        "1. Overall performance (win rate, average R:R, net P&L).\n"
+        "2. Patterns & mistakes (e.g., entering without confirmation, chasing trades, moving stops, emotional states).\n"
+        "3. Strengths (what they did well).\n"
+        "4. Specific recommendations (what to stop doing, what to start doing).\n"
+        "5. Actionable habits to build.\n"
         "Make it clear, concise, and supportive."
     )
 
     genai.configure(api_key=GOOGLE_API_KEY)
 
-    # Auto-detect a working model
-    try:
-        models = genai.list_models()
-        selected_model = None
-        for model in models:
-            if "generateContent" in model.supported_generation_methods and "tuned" not in model.name:
-                selected_model = model.name
-                break
-        if not selected_model:
-            # Fallback to common model names
-            fallback_models = [
-                "models/gemini-1.5-flash",
-                "models/gemini-1.5-pro",
-                "models/gemini-1.0-pro"
-            ]
-            for candidate in fallback_models:
-                try:
-                    genai.get_model(candidate)
-                    selected_model = candidate
-                    break
-                except:
-                    continue
-        if not selected_model:
-            raise Exception("No suitable model found. Please check your API key and permissions.")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error selecting model: {str(e)}")
+    # List of model names to try (most reliable first)
+    model_names = [
+        "gemini-1.5-flash",
+        "gemini-1.0-pro",
+        "models/gemini-1.5-flash",
+        "models/gemini-1.0-pro"
+    ]
+    last_error = None
 
-    try:
-        model = genai.GenerativeModel(
-            model_name=selected_model,
-            system_instruction=system_prompt
-        )
-        response = model.generate_content(user_content)
-        advice = response.text
-        return {"advice": advice}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
+    for model_name in model_names:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(full_prompt)
+            advice = response.text
+            return {"advice": advice}
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    # If all fail, raise error
+    raise HTTPException(status_code=500, detail=f"All Gemini models failed. Last error: {last_error}")
 
 
 # ---------- ROOT ----------
