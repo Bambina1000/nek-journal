@@ -20,7 +20,7 @@ import io
 import json
 import re
 from collections import Counter
-import openai                     # <--- ADDED
+import google.generativeai as genai   # <--- ADDED
 
 # ---------- RATE LIMITING ----------
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -40,7 +40,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
-# OpenAI API key
+# Google Gemini API key (FREE)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 if not GOOGLE_API_KEY:
     print("⚠️  WARNING: GOOGLE_API_KEY not set. Coach feature will not work.")
@@ -604,7 +604,7 @@ def export_csv(db: Session = Depends(get_db), current_user: models.User = Depend
     return response
 
 
-# ---------- AI TRADING COACH ----------
+# ---------- AI TRADING COACH (Google Gemini - FREE) ----------
 @app.post("/coach/")
 async def get_coach_advice(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not GOOGLE_API_KEY:
@@ -655,7 +655,7 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
     try:
         genai.configure(api_key=GOOGLE_API_KEY)
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",  # Free, fast, and good quality
+            model_name="gemini-1.5-flash",  # Free & fast
             system_instruction=system_prompt
         )
         response = model.generate_content(user_content)
