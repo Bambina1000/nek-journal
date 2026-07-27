@@ -41,9 +41,9 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
 # OpenAI API key
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-if not OPENAI_API_KEY:
-    print("⚠️  WARNING: OPENAI_API_KEY not set. Coach feature will not work.")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+if not GOOGLE_API_KEY:
+    print("⚠️  WARNING: GOOGLE_API_KEY not set. Coach feature will not work.")
 
 # CORS allowed origins – split by comma
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://your-app.onrender.com,http://localhost:8000").split(",")
@@ -607,10 +607,10 @@ def export_csv(db: Session = Depends(get_db), current_user: models.User = Depend
 # ---------- AI TRADING COACH ----------
 @app.post("/coach/")
 async def get_coach_advice(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if not OPENAI_API_KEY:
-        raise HTTPException(status_code=503, detail="OpenAI API key not configured")
+    if not GOOGLE_API_KEY:
+        raise HTTPException(status_code=503, detail="Google API key not configured")
 
-    # Fetch last 30 trades (or all if fewer)
+    # Fetch last 30 trades
     trades = db.query(models.Trade).filter(
         models.Trade.user_id == current_user.id
     ).order_by(models.Trade.created_at.desc()).limit(30).all()
@@ -653,20 +653,16 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
     )
 
     try:
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # you can change to "gpt-4" if you have access
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
-            ],
-            temperature=0.7,
-            max_tokens=1500,
+        genai.configure(api_key=GOOGLE_API_KEY)
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",  # Free, fast, and good quality
+            system_instruction=system_prompt
         )
-        advice = response.choices[0].message.content
+        response = model.generate_content(user_content)
+        advice = response.text
         return {"advice": advice}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Google Gemini error: {str(e)}")
 
 
 # ---------- ROOT ----------
