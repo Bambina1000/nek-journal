@@ -610,7 +610,6 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
     if not GOOGLE_API_KEY:
         raise HTTPException(status_code=503, detail="Google API key not configured")
 
-    # Fetch last 30 trades
     trades = db.query(models.Trade).filter(
         models.Trade.user_id == current_user.id
     ).order_by(models.Trade.created_at.desc()).limit(30).all()
@@ -618,7 +617,6 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
     if not trades:
         return {"advice": "You haven't logged any trades yet. Start trading and come back for insights!"}
 
-    # Build summaries
     trade_summaries = []
     for t in trades:
         summary = (
@@ -641,6 +639,7 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
     )
 
     user_content = (
+        system_prompt + "\n\n"
         "Here are the last trades of one of your students. Analyze the data and write a detailed coaching report.\n\n"
         "Trade Summaries:\n" + "\n".join(trade_summaries) + "\n\n"
         "Please provide a structured report covering:\n"
@@ -654,10 +653,7 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
 
     try:
         genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",  # Free & fast
-            system_instruction=system_prompt
-        )
+        model = genai.GenerativeModel(model_name="gemini-pro")  # Use gemini-pro
         response = model.generate_content(user_content)
         advice = response.text
         return {"advice": advice}
