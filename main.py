@@ -140,11 +140,17 @@ async def get_current_user_info(current_user: models.User = Depends(get_current_
     return current_user
 
 
-# ---------- ACCOUNT ENDPOINTS ----------
+# ---------- ACCOUNT ENDPOINTS (updated for challenge fields) ----------
 @app.post("/accounts/", response_model=schemas.AccountResponse)
 def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db),
                    current_user: models.User = Depends(get_current_user)):
-    db_account = models.Account(**account.dict(), user_id=current_user.id)
+    account_data = account.dict()
+    account_data["user_id"] = current_user.id
+    if account_data.get("current_balance") is None:
+        account_data["current_balance"] = account_data.get("starting_balance", 0.0)
+    if account_data.get("challenge_status") is None:
+        account_data["challenge_status"] = "Active"
+    db_account = models.Account(**account_data)
     db.add(db_account)
     db.commit()
     db.refresh(db_account)
@@ -161,7 +167,8 @@ def update_account(account_id: int, account: schemas.AccountUpdate, db: Session 
                                                  models.Account.user_id == current_user.id).first()
     if not db_account:
         raise HTTPException(status_code=404, detail="Account not found")
-    for key, value in account.dict(exclude_unset=True).items():
+    update_data = account.dict(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(db_account, key, value)
     db.commit()
     db.refresh(db_account)
@@ -179,7 +186,104 @@ def delete_account(account_id: int, db: Session = Depends(get_db),
     return {"message": "Account deleted"}
 
 
-# ---------- TRADE ENDPOINTS ----------
+# ---------- ACCOUNT METRICS UPDATE FUNCTION ----------
+def update_account_metrics(account_id: int, db: Session):
+    """Recalculate the account's current balance, drawdown, profit, and challenge status."""
+    account = db.query(models.Account).filter(models.Account.id == account_id).first()
+    if not account:
+        return
+
+    # Only process if account is a challenge or instant
+    if account.account_type not in ["Challenge", "Instant"]:
+        return
+
+    # Get all trades for this account, ordered by time
+    trades = db.query(models.Trade).filter(
+        models.Trade.account_id == account_id
+    ).order_by(models.Trade.created_at.asc()).all()
+
+    if not trades:
+        account.current_balance = account.starting_balance
+        account.challenge_status = "Active"
+        db.commit()
+        return
+
+    starting_balance = account.starting_balance
+    running_balance = starting_balance
+    overall_peak = starting_balance
+    max_drawdown = 0.0
+
+    # For daily drawdown tracking
+    daily_peak = {}
+    daily_min = {}
+    current_day = None
+    day_peak = starting_balance
+    day_min = starting_balance
+
+    # Profit target
+    profit_target = starting_balance * (1 + account.profit_target_percent / 100.0)
+
+    for trade in trades:
+        trade_date = trade.created_at.date()
+        if current_day is None or trade_date != current_day:
+            if current_day is not None:
+                daily_peak[current_day] = day_peak
+                daily_min[current_day] = day_min
+            current_day = trade_date
+            day_peak = running_balance
+            day_min = running_balance
+
+        running_balance += trade.pnl
+        if running_balance > day_peak:
+            day_peak = running_balance
+        if running_balance < day_min:
+            day_min = running_balance
+        if running_balance > overall_peak:
+            overall_peak = running_balance
+
+    # Record last day
+    if current_day is not None:
+        daily_peak[current_day] = day_peak
+        daily_min[current_day] = day_min
+
+    # Compute overall drawdown
+    if overall_peak > starting_balance:
+        # Recompute max drawdown by iterating again
+        running = starting_balance
+        peak = starting_balance
+        for trade in trades:
+            running += trade.pnl
+            if running > peak:
+                peak = running
+            drawdown_pct = (peak - running) / peak * 100 if peak > 0 else 0
+            if drawdown_pct > max_drawdown:
+                max_drawdown = drawdown_pct
+
+    # Compute max daily drawdown
+    max_daily_drawdown_pct = 0.0
+    for day, peak_val in daily_peak.items():
+        min_val = daily_min.get(day, peak_val)
+        if peak_val > 0:
+            dd = (peak_val - min_val) / peak_val * 100
+            if dd > max_daily_drawdown_pct:
+                max_daily_drawdown_pct = dd
+
+    # Determine status
+    challenge_status = "Active"
+    if running_balance >= profit_target:
+        challenge_status = "Passed"
+    elif max_drawdown >= account.max_drawdown_percent:
+        challenge_status = "Failed"
+    elif max_daily_drawdown_pct >= account.daily_drawdown_percent:
+        challenge_status = "Failed"
+
+    # Update account
+    account.current_balance = running_balance
+    account.challenge_status = challenge_status
+    db.commit()
+
+
+# ---------- TRADE ENDPOINTS (with automatic account metrics update) ----------
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 @app.post("/trades/", response_model=schemas.TradeResponse)
@@ -251,6 +355,8 @@ async def create_trade(
     db.add(db_trade)
     db.commit()
     db.refresh(db_trade)
+    if account_id:
+        update_account_metrics(account_id, db)
     db_trade = db.query(models.Trade).filter(models.Trade.id == db_trade.id).first()
     return db_trade
 
@@ -308,6 +414,8 @@ async def update_trade(
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
 
+    old_account_id = db_trade.account_id
+
     if before_image is not None:
         db_trade.before_image = before_image
     if after_image is not None:
@@ -346,6 +454,12 @@ async def update_trade(
 
     db.commit()
     db.refresh(db_trade)
+
+    if old_account_id:
+        update_account_metrics(old_account_id, db)
+    if account_id and account_id != old_account_id:
+        update_account_metrics(account_id, db)
+
     return db_trade
 
 @app.delete("/trades/{trade_id}")
@@ -354,8 +468,11 @@ def delete_trade(trade_id: int, db: Session = Depends(get_db), current_user: mod
                                              models.Trade.user_id == current_user.id).first()
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
+    account_id = db_trade.account_id
     db.delete(db_trade)
     db.commit()
+    if account_id:
+        update_account_metrics(account_id, db)
     return {"message": "Trade deleted"}
 
 
@@ -617,13 +734,12 @@ async def list_available_models():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ---------- AI TRADING COACH (FIXED) ----------
+# ---------- AI TRADING COACH ----------
 @app.post("/coach/")
 async def get_coach_advice(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if not GOOGLE_API_KEY:
         raise HTTPException(status_code=503, detail="Google API key not configured")
 
-    # Only fetch last 10 trades to keep prompt short
     trades = db.query(models.Trade).filter(
         models.Trade.user_id == current_user.id
     ).order_by(models.Trade.created_at.desc()).limit(10).all()
@@ -633,7 +749,6 @@ async def get_coach_advice(db: Session = Depends(get_db), current_user: models.U
 
     trade_summaries = []
     for t in trades:
-        # Truncate journal entry to 500 chars to save tokens
         journal = (t.journal_entry or 'N/A')[:500]
         summary = (
             f"Pair: {t.pair}, Direction: {t.direction}, "

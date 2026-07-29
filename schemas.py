@@ -28,9 +28,16 @@ class AccountBase(BaseModel):
     name: str
     starting_balance: float = 0.0
     broker: Optional[str] = None
-    account_type: Optional[str] = None
+    account_type: Optional[str] = None      # "Challenge", "Instant", "Real"
     status: str = "Active"
     purchase_cost: float = 0.0
+    # ---- NEW CHALLENGE FIELDS ----
+    phase: Optional[str] = None             # "Phase 1", "Phase 2", "Instant"
+    profit_target_percent: float = 8.0      # target profit percentage to pass
+    max_drawdown_percent: float = 8.0       # maximum allowed drawdown
+    daily_drawdown_percent: float = 4.0     # daily drawdown limit
+    current_balance: Optional[float] = None # computed from trades
+    challenge_status: Optional[str] = "Active"  # "Active", "Passed", "Failed"
 
 class AccountCreate(AccountBase):
     pass
@@ -48,6 +55,12 @@ class AccountUpdate(BaseModel):
     account_type: Optional[str] = None
     status: Optional[str] = None
     purchase_cost: Optional[float] = None
+    phase: Optional[str] = None
+    profit_target_percent: Optional[float] = None
+    max_drawdown_percent: Optional[float] = None
+    daily_drawdown_percent: Optional[float] = None
+    current_balance: Optional[float] = None
+    challenge_status: Optional[str] = None
 
 # ===== TRADE =====
 class TradeCreate(BaseModel):

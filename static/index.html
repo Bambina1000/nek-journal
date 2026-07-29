@@ -611,6 +611,8 @@
                     <select id="accountSelect" onchange="applyFiltersAndUpdate()">
                         <option value="all">All</option>
                     </select>
+                    <!-- Status badge -->
+                    <span id="accountStatusBadge" style="font-size:0.6rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:0.5rem;display:none;">Active</span>
                     <button class="add-account-btn" onclick="openAddAccountModal()">+ Add</button>
                     <button class="manage-account-btn" onclick="openManageAccountsModal()" title="Manage Accounts">⚙️</button>
                     <span style="font-size:0.55rem;color:rgba(212,168,83,0.6);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Session:</span>
@@ -625,12 +627,27 @@
                     <div><span class="label">Bal:</span><span class="value" id="account-balance">$0</span></div>
                     <div><span class="label">P&L:</span><span class="value" id="account-pnl">$0</span></div>
                     <div><span class="label">Ret:</span><span class="value" id="account-pnl-pct">0%</span></div>
+                    <!-- Challenge progress bar (hidden by default) -->
+                    <div id="challengeProgress" style="display:none;width:100%;margin-top:0.2rem;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.55rem;color:var(--text-secondary);">
+                            <span>Profit Target</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div style="width:100%;height:4px;background:var(--bg-body);border-radius:2px;margin-top:0.1rem;">
+                            <div id="progressBar" style="height:100%;border-radius:2px;width:0%;background:var(--gold);transition:width 0.3s;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </header>
 
         <!-- MAIN -->
         <main class="main">
+            <!-- Challenge Alert Banner -->
+            <div id="challengeAlert" style="display:none;margin-bottom:0.75rem;padding:0.75rem 1rem;border-radius:0.75rem;border-left:4px solid var(--gold);background:var(--bg-card);border:1px solid var(--border-color);">
+                <span id="alertMessage" style="font-weight:600;"></span>
+            </div>
+
             <!-- DASHBOARD -->
             <div id="view-dashboard" class="view active">
                 <div class="grid-3" style="margin-bottom:0.75rem;">
@@ -882,7 +899,7 @@
         </div>
     </div>
 
-    <!-- ===== ADD ACCOUNT MODAL ===== -->
+    <!-- ===== ADD ACCOUNT MODAL (UPDATED) ===== -->
     <div id="addAccountModal" class="modal-backdrop">
         <div class="modal-content slide-in" style="max-width:500px;">
             <button class="close" onclick="closeAddAccountModal()">&times;</button>
@@ -899,6 +916,31 @@
                     <div class="form-group"><label>Status</label><select id="acc-status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
                 </div>
                 <div class="form-group"><label>Purchase Cost (Optional) ($)</label><input type="number" step="any" id="acc-purchase-cost" placeholder="0" /></div>
+
+                <!-- NEW CHALLENGE FIELDS -->
+                <div class="form-group">
+                    <label>Phase</label>
+                    <select id="acc-phase">
+                        <option value="Phase 1">Phase 1</option>
+                        <option value="Phase 2">Phase 2</option>
+                        <option value="Instant">Instant</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Profit Target (%)</label>
+                        <input type="number" step="any" id="acc-profit-target" value="8" />
+                    </div>
+                    <div class="form-group">
+                        <label>Max Drawdown (%)</label>
+                        <input type="number" step="any" id="acc-max-drawdown" value="8" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Daily Drawdown (%)</label>
+                    <input type="number" step="any" id="acc-daily-drawdown" value="4" />
+                </div>
+
                 <div class="flex-end">
                     <button type="button" class="cancel" onclick="closeAddAccountModal()">Cancel</button>
                     <button type="submit" class="btn-gold">Add Account</button>
@@ -919,6 +961,7 @@
     <!-- ===== AUTH MODAL ===== -->
     <div id="authModal" class="show">
         <div class="glass-card" id="glassCard">
+            <img src="/static/logo.jpg" alt="NEK Journal Logo" style="display:block; margin:0 auto 0.5rem auto; max-height:60px; width:auto; border-radius:0.5rem; opacity:0.9;" />
             <h2>NEK JOURNAL</h2>
             <p class="subtitle">Secure your trades</p>
             <div class="auth-tabs">
@@ -1259,6 +1302,16 @@
                 allAccountsCache = await res.json();
                 populateAccountSelects();
                 renderAccountList();
+                // Update status display after account fetch
+                const selectedId = document.getElementById('accountSelect').value;
+                if (selectedId !== 'all') {
+                    updateAccountStatusDisplay(selectedId);
+                } else {
+                    // hide badge and progress
+                    document.getElementById('accountStatusBadge').style.display = 'none';
+                    document.getElementById('challengeProgress').style.display = 'none';
+                    document.getElementById('challengeAlert').style.display = 'none';
+                }
             } catch (err) {
                 console.error('Account fetch error:', err);
                 if (err.message.includes('401')) logout();
@@ -1376,7 +1429,13 @@
             if (accountId !== 'all') {
                 const account = allAccountsCache.find(a => a.id == accountId);
                 if (account) baseCapital = account.starting_balance;
+                // update status display
+                updateAccountStatusDisplay(accountId);
             } else {
+                // all accounts: hide challenge specific displays
+                document.getElementById('accountStatusBadge').style.display = 'none';
+                document.getElementById('challengeProgress').style.display = 'none';
+                document.getElementById('challengeAlert').style.display = 'none';
                 baseCapital = allAccountsCache.reduce((sum, a) => sum + a.starting_balance, 0);
             }
 
@@ -1388,7 +1447,7 @@
         }
 
         // ============================================================
-        // ACCOUNT CRUD
+        // ACCOUNT CRUD (UPDATED for new fields)
         // ============================================================
         document.getElementById('accountForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1399,6 +1458,11 @@
                 account_type: document.getElementById('acc-type').value,
                 status: document.getElementById('acc-status').value,
                 purchase_cost: parseFloat(document.getElementById('acc-purchase-cost').value) || 0,
+                // new fields
+                phase: document.getElementById('acc-phase').value,
+                profit_target_percent: parseFloat(document.getElementById('acc-profit-target').value) || 8,
+                max_drawdown_percent: parseFloat(document.getElementById('acc-max-drawdown').value) || 8,
+                daily_drawdown_percent: parseFloat(document.getElementById('acc-daily-drawdown').value) || 4,
             };
             try {
                 const res = await apiFetch(`${API_URL}/accounts/`, {
@@ -1415,12 +1479,70 @@
         });
 
         function openAddAccountModal() {
+            // Reset fields to default
+            document.getElementById('acc-phase').value = 'Phase 1';
+            document.getElementById('acc-profit-target').value = 8;
+            document.getElementById('acc-max-drawdown').value = 8;
+            document.getElementById('acc-daily-drawdown').value = 4;
             document.getElementById('addAccountModal').classList.add('show');
         }
 
         function closeAddAccountModal() {
             document.getElementById('addAccountModal').classList.remove('show');
             document.getElementById('accountForm').reset();
+        }
+
+        // ============================================================
+        // ACCOUNT STATUS DISPLAY (badge, progress, alert)
+        // ============================================================
+        function updateAccountStatusDisplay(accountId) {
+            const badge = document.getElementById('accountStatusBadge');
+            const alertDiv = document.getElementById('challengeAlert');
+            const alertMsg = document.getElementById('alertMessage');
+            const progressDiv = document.getElementById('challengeProgress');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressPercent');
+
+            // Find account
+            const account = allAccountsCache.find(a => a.id == accountId);
+            if (!account || account.account_type !== 'Challenge') {
+                badge.style.display = 'none';
+                alertDiv.style.display = 'none';
+                progressDiv.style.display = 'none';
+                return;
+            }
+
+            // ---- Status Badge ----
+            badge.style.display = 'inline-block';
+            let statusText = account.challenge_status || 'Active';
+            let color = '#d4a853'; // gold
+            if (statusText === 'Passed') color = '#22c55e';
+            else if (statusText === 'Failed') color = '#ef4444';
+            badge.textContent = statusText;
+            badge.style.backgroundColor = color;
+            badge.style.color = '#fff';
+
+            // ---- Alert Banner ----
+            if (statusText === 'Passed' || statusText === 'Failed') {
+                alertDiv.style.display = 'block';
+                alertMsg.textContent = `🎯 Account "${account.name}" has ${statusText.toLowerCase()}!`;
+                alertDiv.style.borderLeftColor = color;
+            } else {
+                alertDiv.style.display = 'none';
+            }
+
+            // ---- Profit Progress (only if challenge and starting balance > 0) ----
+            if (account.account_type === 'Challenge' && account.starting_balance > 0) {
+                const currentBalance = account.current_balance !== undefined ? account.current_balance : account.starting_balance;
+                const target = account.starting_balance * (1 + (account.profit_target_percent || 8) / 100);
+                const progress = ((currentBalance - account.starting_balance) / (target - account.starting_balance)) * 100;
+                const clamped = Math.min(100, Math.max(0, progress));
+                progressDiv.style.display = 'block';
+                progressBar.style.width = clamped + '%';
+                progressText.textContent = Math.round(clamped) + '%';
+            } else {
+                progressDiv.style.display = 'none';
+            }
         }
 
         // ============================================================

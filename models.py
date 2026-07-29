@@ -26,9 +26,18 @@ class Account(Base):
     name = Column(String, nullable=False)
     starting_balance = Column(Float, default=0.0)
     broker = Column(String, nullable=True)
-    account_type = Column(String, nullable=True)
-    status = Column(String, default="Active")
+    account_type = Column(String, nullable=True)          # "Challenge", "Instant", "Real"
+    status = Column(String, default="Active")            # Active, Inactive
     purchase_cost = Column(Float, default=0.0)
+
+    # ---- NEW CHALLENGE TRACKING FIELDS ----
+    phase = Column(String, nullable=True)                 # "Phase 1", "Phase 2", "Instant"
+    profit_target_percent = Column(Float, default=8.0)    # e.g. 8% to pass
+    max_drawdown_percent = Column(Float, default=8.0)     # maximum allowed drawdown
+    daily_drawdown_percent = Column(Float, default=4.0)   # daily drawdown limit
+    current_balance = Column(Float, nullable=True)        # computed from trades, stored for quick access
+    challenge_status = Column(String, default="Active")   # "Active", "Passed", "Failed"
+
     created_at = Column(DateTime, default=datetime.utcnow)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
