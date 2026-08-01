@@ -544,6 +544,36 @@
         .coach-response ul, .coach-response ol { padding-left: 1.5rem; margin: 0.3rem 0; }
         .coach-response li { margin: 0.2rem 0; }
         .coach-response .section-title { display: block; font-weight: 700; color: var(--gold); margin-top: 0.75rem; font-size: 1.05rem; }
+
+        /* ===== WEEKLY REVIEW ===== */
+        .review-stars {
+            display: flex;
+            gap: 0.3rem;
+            align-items: center;
+            margin-top: 0.25rem;
+        }
+        .review-star {
+            font-size: 2rem;
+            cursor: pointer;
+            color: #2a3a5a;
+            transition: all 0.2s;
+            filter: drop-shadow(0 0 2px rgba(0,0,0,0));
+            line-height: 1;
+        }
+        .review-star.active {
+            color: #fbbf24;
+            filter: drop-shadow(0 0 12px rgba(251,191,36,0.4));
+        }
+        .review-star:hover {
+            transform: scale(1.2);
+        }
+        .review-status {
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+        .review-status.success { color: #4ade80; }
+        .review-status.error { color: #f87171; }
     </style>
 </head>
 <body>
@@ -570,10 +600,14 @@
                 <span>📋</span>
                 <span class="hidden-text">Watchlist</span>
             </button>
-            <!-- === COACH === -->
             <button onclick="switchView('coach'); closeSidebar();" id="nav-coach" class="nav-item">
                 <span>🤖</span>
                 <span class="hidden-text">Coach</span>
+            </button>
+            <!-- WEEKLY REVIEW (new) -->
+            <button onclick="switchView('weekly'); closeSidebar();" id="nav-weekly" class="nav-item">
+                <span>📅</span>
+                <span class="hidden-text">Weekly Review</span>
             </button>
         </nav>
         <div class="sidebar-footer">
@@ -794,6 +828,60 @@
                         Generate Coaching Report
                     </button>
                     <div id="coachAdvice" class="coach-response" style="margin-top:1rem;display:none;"></div>
+                </div>
+            </div>
+
+            <!-- ========== WEEKLY REVIEW (NEW) ========== -->
+            <div id="view-weekly" class="view">
+                <div class="card" style="max-width:820px; margin:0 auto;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding-bottom:0.5rem;margin-bottom:1rem;">
+                        <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;color:var(--gold);">
+                            📅 Weekly Review
+                        </h3>
+                        <span id="weekDisplay" style="font-size:0.7rem;color:var(--text-secondary);">Loading week…</span>
+                    </div>
+
+                    <form id="weeklyReviewForm">
+                        <!-- Overall Reflection -->
+                        <div class="form-group">
+                            <label for="weeklyReviewText">📝 Overall reflection</label>
+                            <textarea id="weeklyReviewText" rows="4" placeholder="How did the week go? Wins, losses, lessons…" style="resize:vertical;"></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="weeklyMistakes">❌ Mistakes</label>
+                                <textarea id="weeklyMistakes" rows="2" placeholder="What went wrong?" style="resize:vertical;"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="weeklyWins">✅ Wins & right decisions</label>
+                                <textarea id="weeklyWins" rows="2" placeholder="What did you do well?" style="resize:vertical;"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="weeklyLessons">🧠 Key takeaways</label>
+                            <textarea id="weeklyLessons" rows="2" placeholder="What will you do differently next week?" style="resize:vertical;"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>⭐ Rate your week</label>
+                            <div class="review-stars" id="weeklyStars">
+                                <span class="review-star" data-value="1">★</span>
+                                <span class="review-star" data-value="2">★</span>
+                                <span class="review-star" data-value="3">★</span>
+                                <span class="review-star" data-value="4">★</span>
+                                <span class="review-star" data-value="5">★</span>
+                            </div>
+                            <input type="hidden" id="weeklyRating" value="0" />
+                        </div>
+
+                        <button type="submit" class="btn-gold" id="weeklySaveBtn" style="width:100%;margin-top:0.5rem;">
+                            💾 Save Review
+                        </button>
+                    </form>
+
+                    <div id="weeklyStatus" class="review-status"></div>
                 </div>
             </div>
         </main>
@@ -1178,6 +1266,14 @@
                 return null;
             }
         }
+        // ---------- ACCOUNT SELECTION PERSISTENCE ----------
+        function saveSelectedAccount(accountId) {
+            localStorage.setItem('selectedAccountId', accountId);
+        }
+
+        function loadSelectedAccount() {
+            return localStorage.getItem('selectedAccountId') || 'all';
+        }
 
         // ============================================================
         // CONFIG & AUTH
@@ -1245,6 +1341,7 @@
             }
         }
 
+
         async function register(e) {
             e.preventDefault();
             const username = document.getElementById('reg-username').value;
@@ -1290,6 +1387,10 @@
             await fetchAccounts();
             await fetchTrades();
             await fetchWatchlist();
+            // After data is loaded, if weekly view is active, load review
+            if (document.getElementById('view-weekly').classList.contains('active')) {
+                loadWeeklyReview();
+            }
         }
 
         async function fetchAccounts() {
@@ -2036,7 +2137,7 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('nav-' + view).classList.add('active');
             document.getElementById('view-title').textContent = view === 'dashboard' ? 'Dashboard' : view === 'analytics' ? 'Analytics' :
-                view === 'watchlist' ? 'Watchlist' : 'Coach';
+                view === 'watchlist' ? 'Watchlist' : view === 'coach' ? 'Coach' : 'Weekly Review';
             if (view === 'dashboard' && equityChartInstance) equityChartInstance.resize();
             if (view === 'analytics') renderAnalytics(allTradesCache);
             if (view === 'watchlist') renderWatchlist();
@@ -2044,7 +2145,126 @@
                 document.getElementById('coachBtn').disabled = false;
                 document.getElementById('coachBtn').textContent = 'Generate Coaching Report';
             }
+            if (view === 'weekly') {
+                loadWeeklyReview();
+            }
         }
+
+        // ============================================================
+        // WEEKLY REVIEW (NEW)
+        // ============================================================
+        function getMondayOfWeek(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            d.setDate(diff);
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function formatDateForApi(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        let weeklyStarRating = 0;
+
+        function initWeeklyStars() {
+            const stars = document.querySelectorAll('#weeklyStars .review-star');
+            const hidden = document.getElementById('weeklyRating');
+            stars.forEach(star => {
+                star.addEventListener('click', function() {
+                    const val = parseInt(this.dataset.value);
+                    weeklyStarRating = val;
+                    hidden.value = val;
+                    updateStarsUI(val);
+                });
+                star.addEventListener('mouseenter', function() {
+                    const val = parseInt(this.dataset.value);
+                    updateStarsUI(val);
+                });
+                star.addEventListener('mouseleave', function() {
+                    updateStarsUI(weeklyStarRating);
+                });
+            });
+        }
+
+        function updateStarsUI(val) {
+            document.querySelectorAll('#weeklyStars .review-star').forEach(s => {
+                const sv = parseInt(s.dataset.value);
+                s.classList.toggle('active', sv <= val);
+            });
+        }
+
+        async function loadWeeklyReview() {
+            const weekStart = getMondayOfWeek(new Date());
+            const weekStr = formatDateForApi(weekStart);
+            document.getElementById('weekDisplay').textContent = `Week of ${weekStr}`;
+
+            try {
+                const res = await apiFetch(`/weekly-review/?week_start=${weekStr}`);
+                if (!res.ok) throw new Error('Failed to load review');
+                const data = await res.json();
+
+                document.getElementById('weeklyReviewText').value = data.review_text || '';
+                document.getElementById('weeklyMistakes').value = data.mistakes || '';
+                document.getElementById('weeklyWins').value = data.wins || '';
+                document.getElementById('weeklyLessons').value = data.lessons || '';
+
+                const rating = data.rating || 0;
+                weeklyStarRating = rating;
+                document.getElementById('weeklyRating').value = rating;
+                updateStarsUI(rating);
+
+                document.getElementById('weeklyStatus').textContent = '';
+                document.getElementById('weeklyStatus').className = 'review-status';
+            } catch (err) {
+                console.error('Load weekly review error:', err);
+                document.getElementById('weeklyStatus').textContent = 'Could not load review.';
+                document.getElementById('weeklyStatus').className = 'review-status error';
+            }
+        }
+
+        document.getElementById('weeklyReviewForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const statusEl = document.getElementById('weeklyStatus');
+            const saveBtn = document.getElementById('weeklySaveBtn');
+            saveBtn.disabled = true;
+            statusEl.textContent = 'Saving…';
+            statusEl.className = 'review-status';
+
+            const weekStart = getMondayOfWeek(new Date());
+            const weekStr = formatDateForApi(weekStart);
+
+            const payload = {
+                week_start: weekStr,
+                review_text: document.getElementById('weeklyReviewText').value.trim(),
+                mistakes: document.getElementById('weeklyMistakes').value.trim(),
+                wins: document.getElementById('weeklyWins').value.trim(),
+                lessons: document.getElementById('weeklyLessons').value.trim(),
+                rating: parseInt(document.getElementById('weeklyRating').value) || 0,
+            };
+
+            try {
+                const res = await apiFetch('/weekly-review/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error('Save failed');
+                const data = await res.json();
+                statusEl.textContent = '✅ Review saved successfully!';
+                statusEl.className = 'review-status success';
+            } catch (err) {
+                console.error('Save weekly review error:', err);
+                statusEl.textContent = '❌ Failed to save. Please try again.';
+                statusEl.className = 'review-status error';
+            } finally {
+                saveBtn.disabled = false;
+            }
+        });
 
         // ============================================================
         // METRICS
@@ -2699,6 +2919,9 @@
                     else prevImage();
                 }
             }, { passive: true });
+
+            // Initialize weekly stars
+            initWeeklyStars();
         });
 
         // ============================================================

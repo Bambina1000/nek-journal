@@ -145,3 +145,22 @@ class ReportSettingResponse(ReportSettingBase):
     last_sent: Optional[datetime] = None
     class Config:
         orm_mode = True
+
+# ===== WEEKLY REVIEW (NEW) =====
+class WeeklyReviewBase(BaseModel):
+    week_start: datetime
+    review_text: Optional[str] = ""
+    mistakes: Optional[str] = ""
+    wins: Optional[str] = ""
+    lessons: Optional[str] = ""
+    rating: Optional[int] = None          # e.g., 1-5
+
+class WeeklyReviewCreate(WeeklyReviewBase):
+    pass
+
+class WeeklyReviewResponse(WeeklyReviewBase):
+    id: int
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    class Config:
+        orm_mode = True

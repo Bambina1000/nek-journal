@@ -20,7 +20,6 @@ import io
 import json
 import re
 from collections import Counter
-import google.generativeai as genai
 
 # ---------- RATE LIMITING ----------
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -39,11 +38,6 @@ SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-
-# Google Gemini API key (FREE)
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-if not GOOGLE_API_KEY:
-    print("⚠️  WARNING: GOOGLE_API_KEY not set. Coach feature will not work.")
 
 # CORS allowed origins – split by comma
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://your-app.onrender.com,http://localhost:8000").split(",")
@@ -140,7 +134,7 @@ async def get_current_user_info(current_user: models.User = Depends(get_current_
     return current_user
 
 
-# ---------- ACCOUNT ENDPOINTS (updated for challenge fields) ----------
+# ---------- ACCOUNT ENDPOINTS ----------
 @app.post("/accounts/", response_model=schemas.AccountResponse)
 def create_account(account: schemas.AccountCreate, db: Session = Depends(get_db),
                    current_user: models.User = Depends(get_current_user)):
@@ -186,18 +180,16 @@ def delete_account(account_id: int, db: Session = Depends(get_db),
     return {"message": "Account deleted"}
 
 
-# ---------- ACCOUNT METRICS UPDATE FUNCTION ----------
+# ---------- ACCOUNT METRICS UPDATE ----------
 def update_account_metrics(account_id: int, db: Session):
     """Recalculate the account's current balance, drawdown, profit, and challenge status."""
     account = db.query(models.Account).filter(models.Account.id == account_id).first()
     if not account:
         return
 
-    # Only process if account is a challenge or instant
     if account.account_type not in ["Challenge", "Instant"]:
         return
 
-    # Get all trades for this account, ordered by time
     trades = db.query(models.Trade).filter(
         models.Trade.account_id == account_id
     ).order_by(models.Trade.created_at.asc()).all()
@@ -213,14 +205,12 @@ def update_account_metrics(account_id: int, db: Session):
     overall_peak = starting_balance
     max_drawdown = 0.0
 
-    # For daily drawdown tracking
     daily_peak = {}
     daily_min = {}
     current_day = None
     day_peak = starting_balance
     day_min = starting_balance
 
-    # Profit target
     profit_target = starting_balance * (1 + account.profit_target_percent / 100.0)
 
     for trade in trades:
@@ -241,25 +231,21 @@ def update_account_metrics(account_id: int, db: Session):
         if running_balance > overall_peak:
             overall_peak = running_balance
 
-    # Record last day
     if current_day is not None:
         daily_peak[current_day] = day_peak
         daily_min[current_day] = day_min
 
-    # Compute overall drawdown
-    if overall_peak > starting_balance:
-        # Recompute max drawdown by iterating again
-        running = starting_balance
-        peak = starting_balance
-        for trade in trades:
-            running += trade.pnl
-            if running > peak:
-                peak = running
-            drawdown_pct = (peak - running) / peak * 100 if peak > 0 else 0
-            if drawdown_pct > max_drawdown:
-                max_drawdown = drawdown_pct
+    # Compute max drawdown
+    running = starting_balance
+    peak = starting_balance
+    for trade in trades:
+        running += trade.pnl
+        if running > peak:
+            peak = running
+        drawdown_pct = (peak - running) / peak * 100 if peak > 0 else 0
+        if drawdown_pct > max_drawdown:
+            max_drawdown = drawdown_pct
 
-    # Compute max daily drawdown
     max_daily_drawdown_pct = 0.0
     for day, peak_val in daily_peak.items():
         min_val = daily_min.get(day, peak_val)
@@ -268,7 +254,6 @@ def update_account_metrics(account_id: int, db: Session):
             if dd > max_daily_drawdown_pct:
                 max_daily_drawdown_pct = dd
 
-    # Determine status
     challenge_status = "Active"
     if running_balance >= profit_target:
         challenge_status = "Passed"
@@ -277,13 +262,12 @@ def update_account_metrics(account_id: int, db: Session):
     elif max_daily_drawdown_pct >= account.daily_drawdown_percent:
         challenge_status = "Failed"
 
-    # Update account
     account.current_balance = running_balance
     account.challenge_status = challenge_status
     db.commit()
 
 
-# ---------- TRADE ENDPOINTS (with automatic account metrics update) ----------
+# ---------- TRADE ENDPOINTS ----------
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 @app.post("/trades/", response_model=schemas.TradeResponse)
@@ -293,9 +277,9 @@ async def create_trade(
         setup_type: str = Form(...),
         position_size: float = Form(...),
         entry_price: float = Form(...),
-        exit_price: float = Form(...),
+        exit_price: float = Form(None),
         risk_reward: float = Form(...),
-        pnl: float = Form(...),
+        pnl: float = Form(None),
         emotion_before: str = Form(...),
         followed_plan: str = Form(...),
         mistakes: str = Form(None),
@@ -502,18 +486,115 @@ def delete_watchlist(item_id: int, db: Session = Depends(get_db),
     return {"message": "Item deleted"}
 
 
+# ---------- WEEKLY REVIEW ENDPOINTS (NEW) ----------
+def get_monday_of_week(date: datetime) -> datetime:
+    """Return the Monday (start of week) for a given date."""
+    return date - timedelta(days=date.weekday())
+
+@app.get("/weekly-review/", response_model=schemas.WeeklyReviewResponse)
+def get_weekly_review(
+    week_start: str = None,  # ISO format date, e.g. "2026-07-27"
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Get the weekly review for a given week (defaults to current week)."""
+    if week_start:
+        try:
+            start_date = datetime.fromisoformat(week_start)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid week_start format. Use YYYY-MM-DD.")
+    else:
+        start_date = datetime.utcnow()
+    monday = get_monday_of_week(start_date).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    review = db.query(models.WeeklyReview).filter(
+        models.WeeklyReview.user_id == current_user.id,
+        models.WeeklyReview.week_start == monday
+    ).first()
+
+    if not review:
+        # Return an empty review object
+        return schemas.WeeklyReviewResponse(
+            id=None,
+            week_start=monday,
+            review_text="",
+            mistakes="",
+            wins="",
+            lessons="",
+            rating=None,
+            created_at=None,
+            updated_at=None
+        )
+    return review
+
+@app.post("/weekly-review/", response_model=schemas.WeeklyReviewResponse)
+def save_weekly_review(
+    review_data: schemas.WeeklyReviewCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Create or update a weekly review for the given week_start."""
+    # Ensure week_start is a datetime object
+    if isinstance(review_data.week_start, str):
+        try:
+            week_start = datetime.fromisoformat(review_data.week_start)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid week_start format. Use YYYY-MM-DD.")
+    else:
+        week_start = review_data.week_start
+
+    # Normalize to Monday
+    monday = get_monday_of_week(week_start).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Check if review exists
+    existing = db.query(models.WeeklyReview).filter(
+        models.WeeklyReview.user_id == current_user.id,
+        models.WeeklyReview.week_start == monday
+    ).first()
+
+    if existing:
+        # Update
+        existing.review_text = review_data.review_text
+        existing.mistakes = review_data.mistakes
+        existing.wins = review_data.wins
+        existing.lessons = review_data.lessons
+        existing.rating = review_data.rating
+        existing.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        # Create
+        new_review = models.WeeklyReview(
+            week_start=monday,
+            review_text=review_data.review_text,
+            mistakes=review_data.mistakes,
+            wins=review_data.wins,
+            lessons=review_data.lessons,
+            rating=review_data.rating,
+            user_id=current_user.id
+        )
+        db.add(new_review)
+        db.commit()
+        db.refresh(new_review)
+        return new_review
+
+
 # ---------- BACKUP & RESTORE ----------
 @app.get("/backup/")
 def backup_data(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     trades = db.query(models.Trade).filter(models.Trade.user_id == current_user.id).all()
     accounts = db.query(models.Account).filter(models.Account.user_id == current_user.id).all()
     watchlist = db.query(models.WatchlistItem).filter(models.WatchlistItem.user_id == current_user.id).all()
+    # Also include weekly reviews
+    reviews = db.query(models.WeeklyReview).filter(models.WeeklyReview.user_id == current_user.id).all()
     data = {
         "trades": [t.__dict__ for t in trades],
         "accounts": [a.__dict__ for a in accounts],
-        "watchlist": [w.__dict__ for w in watchlist]
+        "watchlist": [w.__dict__ for w in watchlist],
+        "weekly_reviews": [r.__dict__ for r in reviews]
     }
-    for key in ["trades", "accounts", "watchlist"]:
+    for key in ["trades", "accounts", "watchlist", "weekly_reviews"]:
         for item in data[key]:
             item.pop("_sa_instance_state", None)
             item.pop("user_id", None)
@@ -522,11 +603,14 @@ def backup_data(db: Session = Depends(get_db), current_user: models.User = Depen
 
 @app.post("/restore/")
 def restore_data(data: dict, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Delete all existing data for this user
     db.query(models.Trade).filter(models.Trade.user_id == current_user.id).delete()
     db.query(models.Account).filter(models.Account.user_id == current_user.id).delete()
     db.query(models.WatchlistItem).filter(models.WatchlistItem.user_id == current_user.id).delete()
+    db.query(models.WeeklyReview).filter(models.WeeklyReview.user_id == current_user.id).delete()
     db.commit()
 
+    # Restore accounts first (to map IDs)
     for acc in data.get("accounts", []):
         acc["user_id"] = current_user.id
         db.add(models.Account(**acc))
@@ -540,6 +624,7 @@ def restore_data(data: dict, db: Session = Depends(get_db), current_user: models
         if new_acc:
             account_map[acc.get("id")] = new_acc.id
 
+    # Restore trades
     for t in data.get("trades", []):
         t.pop("id", None)
         t["user_id"] = current_user.id
@@ -549,10 +634,17 @@ def restore_data(data: dict, db: Session = Depends(get_db), current_user: models
             t["account_id"] = None
         db.add(models.Trade(**t))
 
+    # Restore watchlist
     for w in data.get("watchlist", []):
         w.pop("id", None)
         w["user_id"] = current_user.id
         db.add(models.WatchlistItem(**w))
+
+    # Restore weekly reviews (no foreign keys to other tables)
+    for r in data.get("weekly_reviews", []):
+        r.pop("id", None)
+        r["user_id"] = current_user.id
+        db.add(models.WeeklyReview(**r))
 
     db.commit()
     return {"message": "Data restored successfully"}
@@ -712,87 +804,6 @@ def export_csv(db: Session = Depends(get_db), current_user: models.User = Depend
     response = StreamingResponse(output, media_type="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=trades_export.csv"
     return response
-
-
-# ---------- DEBUG: LIST AVAILABLE MODELS ----------
-@app.get("/debug/models")
-async def list_available_models():
-    if not GOOGLE_API_KEY:
-        raise HTTPException(status_code=503, detail="Google API key not configured")
-    try:
-        genai.configure(api_key=GOOGLE_API_KEY)
-        gemini_models = genai.list_models()
-        available = []
-        for m in gemini_models:
-            available.append({
-                "name": m.name,
-                "display_name": m.display_name,
-                "supported_methods": m.supported_generation_methods
-            })
-        return {"models": available}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ---------- AI TRADING COACH ----------
-@app.post("/coach/")
-async def get_coach_advice(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if not GOOGLE_API_KEY:
-        raise HTTPException(status_code=503, detail="Google API key not configured")
-
-    trades = db.query(models.Trade).filter(
-        models.Trade.user_id == current_user.id
-    ).order_by(models.Trade.created_at.desc()).limit(10).all()
-
-    if not trades:
-        return {"advice": "You haven't logged any trades yet. Start trading and come back for insights!"}
-
-    trade_summaries = []
-    for t in trades:
-        journal = (t.journal_entry or 'N/A')[:500]
-        summary = (
-            f"Pair: {t.pair}, Direction: {t.direction}, "
-            f"Entry: {t.entry_price}, Exit: {t.exit_price}, "
-            f"R:R: {t.risk_reward}, P&L: ${t.pnl:.2f}, "
-            f"Mindset: {t.emotion_before or 'N/A'}, "
-            f"Followed Plan: {t.followed_plan}, "
-            f"Mistakes: {t.mistakes or 'None'}, "
-            f"Journal Entry: {journal}"
-        )
-        trade_summaries.append(summary)
-
-    full_prompt = (
-        "You are a professional trading coach. Analyze the trader's journal and provide feedback.\n\n"
-        "Trade Summaries:\n" + "\n".join(trade_summaries) + "\n\n"
-        "Give a structured report with:\n"
-        "1. Overall performance\n"
-        "2. Patterns & mistakes\n"
-        "3. Strengths\n"
-        "4. Recommendations\n"
-        "5. Actionable habits"
-    )
-
-    genai.configure(api_key=GOOGLE_API_KEY)
-
-    model_names = [
-        "models/gemini-2.0-flash",
-        "models/gemini-2.0-flash-lite",
-        "models/gemini-1.5-flash",
-    ]
-    last_error = None
-
-    for model_name in model_names:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(full_prompt)
-            advice = response.text
-            return {"advice": advice}
-        except Exception as e:
-            last_error = str(e)
-            print(f"Model {model_name} failed: {last_error}")
-            continue
-
-    raise HTTPException(status_code=500, detail=f"All models failed. Last error: {last_error}")
 
 
 # ---------- ROOT ----------

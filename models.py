@@ -17,6 +17,7 @@ class User(Base):
     accounts = relationship("Account", back_populates="owner")
     watchlist = relationship("WatchlistItem", back_populates="owner")
     report_settings = relationship("ReportSetting", back_populates="owner")
+    weekly_reviews = relationship("WeeklyReview", back_populates="owner")  # new
 
 
 class Account(Base):
@@ -29,6 +30,7 @@ class Account(Base):
     account_type = Column(String, nullable=True)          # "Challenge", "Instant", "Real"
     status = Column(String, default="Active")            # Active, Inactive
     purchase_cost = Column(Float, default=0.0)
+    peak_balance = Column(Float, default=0.0)
 
     # ---- NEW CHALLENGE TRACKING FIELDS ----
     phase = Column(String, nullable=True)                 # "Phase 1", "Phase 2", "Instant"
@@ -101,3 +103,24 @@ class ReportSetting(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     owner = relationship("User", back_populates="report_settings")
+
+
+# ---------- NEW: Weekly Review Model ----------
+class WeeklyReview(Base):
+    __tablename__ = "weekly_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # The week this review covers – we store the Monday date (or Sunday) to identify the week.
+    week_start = Column(DateTime, nullable=False, index=True)   # e.g. Monday 00:00
+    # The actual review content
+    review_text = Column(Text, nullable=True)                   # main reflection
+    mistakes = Column(Text, nullable=True)                      # what went wrong
+    wins = Column(Text, nullable=True)                          # what went right
+    lessons = Column(Text, nullable=True)                       # key takeaways
+    rating = Column(Integer, nullable=True)                     # e.g. 1-5 self‑rating for the week
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    owner = relationship("User", back_populates="weekly_reviews")
