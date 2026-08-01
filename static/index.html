@@ -611,11 +611,6 @@
             </button>
         </nav>
         <div class="sidebar-footer">
-            <button onclick="toggleTheme()"><span>⚡</span><span class="hidden-text">Toggle Theme</span></button>
-            <div class="status"><span class="dot"></span><span class="hidden-text">Online</span></div>
-            <button onclick="backupData()" style="background:rgba(212,168,83,0.15);"><span>💾</span><span class="hidden-text">Backup</span></button>
-            <button onclick="document.getElementById('restoreFile').click()" style="background:rgba(212,168,83,0.15);"><span>📂</span><span class="hidden-text">Restore</span></button>
-            <input type="file" id="restoreFile" accept=".json" style="display:none;" onchange="restoreData(event)" />
             <button onclick="logout()" id="logoutBtn" style="background:rgba(255,85,85,0.1);border-color:rgba(255,85,85,0.3);color:#ff5555;"><span>🚪</span><span class="hidden-text">Logout</span></button>
         </div>
     </aside>
@@ -799,36 +794,6 @@
                 <div class="card" style="margin-top:0.75rem;"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🕒 Hourly P&L Heatmap</h3><div style="height:150px;"><canvas id="hourlyChart"></canvas></div></div>
                 <div class="card" style="margin-top:0.75rem;"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">🕒 P&L by Session</h3><div style="height:150px;"><canvas id="sessionChart"></canvas></div></div>
                 <div class="card" style="margin-top:0.75rem;"><h3 style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--gold);border-bottom:1px solid var(--border-color);padding-bottom:0.3rem;margin-bottom:0.4rem;">📈 Trade Distribution</h3><div style="height:150px;max-width:300px;margin:0 auto;"><canvas id="distributionChart"></canvas></div></div>
-            </div>
-
-            <!-- WATCHLIST -->
-            <div id="view-watchlist" class="view">
-                <div class="card">
-                    <h3 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem;">📋 Watchlist</h3>
-                    <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
-                        <input type="text" id="watchlist-symbol" placeholder="e.g. BTC/USD" style="flex:1;" />
-                        <input type="text" id="watchlist-notes" placeholder="Notes" style="flex:2;" />
-                        <button onclick="addWatchlist()" class="btn-gold" style="padding:0.3rem 1rem;">Add</button>
-                    </div>
-                    <div id="watchlist-items"></div>
-                </div>
-            </div>
-
-            <!-- COACH -->
-            <div id="view-coach" class="view">
-                <div class="card">
-                    <h3 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem;">
-                        🤖 AI Trading Coach
-                    </h3>
-                    <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem;">
-                        Get personalised feedback on your trading habits, mistakes, and areas for improvement.
-                        The AI analyzes your last 30 trades and journal entries.
-                    </p>
-                    <button onclick="getCoachAdvice()" class="btn-gold" id="coachBtn" style="width:100%;padding:0.75rem;">
-                        Generate Coaching Report
-                    </button>
-                    <div id="coachAdvice" class="coach-response" style="margin-top:1rem;display:none;"></div>
-                </div>
             </div>
 
             <!-- ========== WEEKLY REVIEW (NEW) ========== -->
