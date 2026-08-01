@@ -14,7 +14,7 @@ class UserResponse(UserBase):
     id: int
     created_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
@@ -46,7 +46,7 @@ class AccountResponse(AccountBase):
     id: int
     created_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
@@ -92,7 +92,7 @@ class TradeResponse(TradeCreate):
     created_at: datetime
     account: Optional[AccountResponse] = None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class TradeUpdate(BaseModel):
     pair: Optional[str] = None
@@ -130,7 +130,7 @@ class WatchlistItemResponse(WatchlistItemBase):
     id: int
     added_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ===== REPORT SETTINGS =====
 class ReportSettingBase(BaseModel):
@@ -144,7 +144,7 @@ class ReportSettingResponse(ReportSettingBase):
     id: int
     last_sent: Optional[datetime] = None
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # ===== WEEKLY REVIEW (NEW) =====
 class WeeklyReviewBase(BaseModel):
@@ -163,4 +163,4 @@ class WeeklyReviewResponse(WeeklyReviewBase):
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     class Config:
-        orm_mode = True
+        from_attributes = True
